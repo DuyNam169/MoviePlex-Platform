@@ -2,70 +2,21 @@
 session_start();
 if (empty($_SESSION['user_id'])) { header('Location: /fe/pages/login.php'); exit; }
 require_once __DIR__ . '/../../be/config/db.php';
+require_once __DIR__ . '/../../be/services/UserService.php';
+
 $uid = $_SESSION['user_id'];
 $active_page = 'profile';
 
-$user = $pdo->prepare("SELECT * FROM users WHERE id=? LIMIT 1");
-$user->execute([$uid]);
-$user = $user->fetch();
+$service = new UserService($pdo);
 
-$msg = ''; $msgType = '';
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
-
-    if ($action === 'update_profile') {
-        $name  = trim($_POST['full_name'] ?? '');
-        $phone = trim($_POST['phone'] ?? '');
-        if (!$name) {
-            $msg = 'Họ tên không được để trống.';
-            $msgType = 'error';
-        } elseif (!empty($phone) && !preg_match('/^(0[35789])[0-9]{8}$/', $phone)) {
-            $msg = 'Số điện thoại không hợp lệ. Vui lòng nhập số gồm 10 chữ số (bắt đầu bằng 03, 05, 07, 08, 09).';
-            $msgType = 'error';
-        } else {
-            $pdo->prepare("UPDATE users SET full_name=?, phone=? WHERE id=?")->execute([$name, $phone ?: null, $uid]);
-            $_SESSION['user_name'] = $name;
-            $msg = 'Cập nhật hồ sơ thành công!'; $msgType = 'success';
-            $user['full_name'] = $name; $user['phone'] = $phone;
-        }
-    }
-
-    if ($action === 'change_password') {
-        $old  = $_POST['old_password']     ?? '';
-        $new  = $_POST['new_password']     ?? '';
-        $conf = $_POST['confirm_password'] ?? '';
-        if (!password_verify($old, $user['password_hash'])) {
-            $msg = 'Mật khẩu hiện tại không đúng.'; $msgType = 'error';
-        } elseif (strlen($new) < 6) {
-            $msg = 'Mật khẩu mới tối thiểu 6 ký tự.'; $msgType = 'error';
-        } elseif ($new !== $conf) {
-            $msg = 'Mật khẩu xác nhận không khớp.'; $msgType = 'error';
-        } else {
-            $hash = password_hash($new, PASSWORD_BCRYPT, ['cost'=>10]);
-            $pdo->prepare("UPDATE users SET password_hash=? WHERE id=?")->execute([$hash, $uid]);
-            $msg = 'Đổi mật khẩu thành công!'; $msgType = 'success';
-        }
-    }
+$profileResult = $service->getProfile($uid);
+if (!$profileResult['success']) {
+    header('Location: /fe/pages/login.php'); exit;
 }
+$user  = $profileResult['user'];
+$stats = $profileResult['stats'];
 
-// Thống kê
-$stats = $pdo->prepare("SELECT COUNT(*) as total, SUM(total_amount) as spent FROM bookings WHERE user_id=? AND status!='cancelled'");
-$stats->execute([$uid]);
-$stats = $stats->fetch();
-
-// Lấy danh sách Voucher khả dụng của người dùng (chưa dùng trong các giao dịch active)
-$vouchers = $pdo->prepare("
-  SELECT v.* 
-  FROM vouchers v
-  WHERE v.is_active=1 
-    AND (v.expire_date IS NULL OR v.expire_date >= CURDATE())
-    AND v.user_id = ? 
-    AND v.used_count < v.max_uses
-  ORDER BY v.id DESC
-");
-$vouchers->execute([$uid]);
-$vouchers = $vouchers->fetchAll();
+$vouchers = $service->getMyVouchers($uid)['data'];
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -124,6 +75,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
 .btn-save{height:48px;padding:0 28px;background:linear-gradient(135deg,var(--blue),var(--indigo));color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:8px;transition:all .25s;box-shadow:0 4px 16px rgba(59,130,246,.3)}
 .btn-save:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(59,130,246,.4)}
+.btn-save:disabled{opacity:.6;cursor:not-allowed;transform:none}
 .points-box{background:linear-gradient(135deg,#F59E0B,#D97706,#B45309);border-radius:16px;padding:28px;color:#fff;margin-bottom:24px;position:relative;overflow:hidden}
 .points-box::before{content:'★';position:absolute;right:-10px;top:-20px;font-size:120px;opacity:.08}
 .points-num{font-size:44px;font-weight:800;line-height:1;letter-spacing:-2px}
@@ -168,8 +120,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
     <div>
       <div class="profile-card">
         <div class="profile-hero">
-          <div class="big-avatar"><?= mb_strtoupper(mb_substr($user['full_name'],0,1)) ?></div>
-          <div class="profile-name"><?= htmlspecialchars($user['full_name']) ?></div>
+          <div class="big-avatar" id="avatar-letter"><?= mb_strtoupper(mb_substr($user['full_name'],0,1)) ?></div>
+          <div class="profile-name" id="display-name"><?= htmlspecialchars($user['full_name']) ?></div>
           <div class="profile-email"><?= htmlspecialchars($user['email']) ?></div>
           <div class="profile-tier"><i class="fa-solid fa-star"></i><?= $user['member_tier'] ?? 'STANDARD' ?></div>
         </div>
@@ -195,18 +147,16 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 
     <!-- RIGHT -->
     <div class="right-col">
-      <?php if($msg): ?>
-      <div class="alert alert-<?= $msgType ?>"><i class="fa-solid fa-<?= $msgType==='success'?'circle-check':'circle-exclamation' ?>"></i><?= htmlspecialchars($msg) ?></div>
-      <?php endif; ?>
+      <div id="alert-box"></div>
 
       <!-- PROFILE INFO -->
       <div class="panel form-section active" id="tab-profile" style="display:block">
         <div class="panel-head"><div class="ph-icon"><i class="fa-regular fa-user"></i></div><h2>Thông tin cá nhân</h2></div>
         <div class="panel-body">
-          <form method="POST">
+          <form id="form-profile">
             <input type="hidden" name="action" value="update_profile">
             <div class="grid2">
-              <div class="fg"><label>Họ và tên</label><input type="text" name="full_name" value="<?= htmlspecialchars($user['full_name']) ?>" required></div>
+              <div class="fg"><label>Họ và tên</label><input type="text" name="full_name" id="inp-full-name" value="<?= htmlspecialchars($user['full_name']) ?>" required></div>
               <div class="fg"><label>Số điện thoại</label><input type="tel" name="phone" value="<?= htmlspecialchars($user['phone'] ?? '') ?>"></div>
             </div>
             <div class="fg"><label>Email</label><input type="email" value="<?= htmlspecialchars($user['email']) ?>" disabled></div>
@@ -214,7 +164,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
               <div class="fg"><label>Ngày tham gia</label><input type="text" value="<?= date('d/m/Y', strtotime($user['created_at'])) ?>" disabled></div>
               <div class="fg"><label>Hạng thành viên</label><input type="text" value="<?= $user['member_tier'] ?? 'STANDARD' ?>" disabled></div>
             </div>
-            <button type="submit" class="btn-save"><i class="fa-solid fa-floppy-disk"></i> Lưu thay đổi</button>
+            <button type="submit" class="btn-save" id="btn-save-profile"><i class="fa-solid fa-floppy-disk"></i> Lưu thay đổi</button>
           </form>
           <div class="tip-box">
             <h4><i class="fa-solid fa-lightbulb"></i> Mẹo nâng cấp tài khoản</h4>
@@ -229,12 +179,12 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
       <div class="panel form-section" id="tab-password" style="display:none">
         <div class="panel-head"><div class="ph-icon"><i class="fa-solid fa-lock"></i></div><h2>Đổi mật khẩu</h2></div>
         <div class="panel-body">
-          <form method="POST">
+          <form id="form-password">
             <input type="hidden" name="action" value="change_password">
             <div class="fg"><label>Mật khẩu hiện tại</label><input type="password" name="old_password" placeholder="••••••••" required></div>
             <div class="fg"><label>Mật khẩu mới</label><input type="password" name="new_password" placeholder="Tối thiểu 6 ký tự" required></div>
             <div class="fg"><label>Xác nhận mật khẩu mới</label><input type="password" name="confirm_password" placeholder="Nhập lại mật khẩu mới" required></div>
-            <button type="submit" class="btn-save"><i class="fa-solid fa-key"></i> Đổi mật khẩu</button>
+            <button type="submit" class="btn-save" id="btn-save-password"><i class="fa-solid fa-key"></i> Đổi mật khẩu</button>
           </form>
         </div>
       </div>
@@ -303,6 +253,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 </div>
 
 <script>
+const USER_ENDPOINT = '/be/controllers/UserController.php';
+
 function showTab(tab) {
   // Hide all panels using inline style
   document.querySelectorAll('.form-section').forEach(s => {
@@ -316,6 +268,7 @@ function showTab(tab) {
   document.querySelectorAll('.pm-item').forEach(i => i.classList.remove('active'));
   event.currentTarget.classList.add('active');
 }
+
 function copyVoucherCode(btn, code) {
   navigator.clipboard.writeText(code).then(() => {
     const originalText = btn.innerHTML;
@@ -327,6 +280,69 @@ function copyVoucherCode(btn, code) {
     }, 2000);
   });
 }
+
+function showAlert(type, message) {
+  const box = document.getElementById('alert-box');
+  const icon = type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation';
+  box.innerHTML = `<div class="alert alert-${type}"><i class="fa-solid ${icon}"></i><span>${message}</span></div>`;
+  box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function setBtnLoading(btnId, loading, originalHtml) {
+  const btn = document.getElementById(btnId);
+  btn.disabled = loading;
+  btn.innerHTML = loading
+    ? '<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...'
+    : originalHtml;
+}
+
+// UPDATE PROFILE
+document.getElementById('form-profile').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const originalHtml = '<i class="fa-solid fa-floppy-disk"></i> Lưu thay đổi';
+  setBtnLoading('btn-save-profile', true, originalHtml);
+
+  const fd = new FormData(this);
+
+  try {
+    const r = await fetch(USER_ENDPOINT, { method: 'POST', body: fd });
+    const d = await r.json();
+
+    if (d.success) {
+      showAlert('success', d.message);
+      document.getElementById('display-name').textContent = d.full_name;
+      document.getElementById('avatar-letter').textContent = d.full_name.charAt(0).toUpperCase();
+    } else {
+      showAlert('error', d.message);
+    }
+  } catch {
+    showAlert('error', 'Lỗi kết nối. Vui lòng thử lại.');
+  } finally {
+    setBtnLoading('btn-save-profile', false, originalHtml);
+  }
+});
+
+// CHANGE PASSWORD
+document.getElementById('form-password').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const originalHtml = '<i class="fa-solid fa-key"></i> Đổi mật khẩu';
+  setBtnLoading('btn-save-password', true, originalHtml);
+
+  const fd = new FormData(this);
+
+  try {
+    const r = await fetch(USER_ENDPOINT, { method: 'POST', body: fd });
+    const d = await r.json();
+
+    showAlert(d.success ? 'success' : 'error', d.message);
+    if (d.success) this.reset();
+  } catch {
+    showAlert('error', 'Lỗi kết nối. Vui lòng thử lại.');
+  } finally {
+    setBtnLoading('btn-save-password', false, originalHtml);
+  }
+});
+
 async function logout(){
   const fd=new FormData();fd.append('action','logout');
   const r=await fetch('../../be/controllers/AuthController.php',{method:'POST',body:fd});
