@@ -60,7 +60,7 @@ Xem chi tiết từng thành phần tại [PROJECT_STRUCTURE.md](./PROJECT_STRUC
 
 ```bash
 git clone https://github.com/ducphat-123/Qualyrapchieuphim.git
-cd Qualyrapchieuphim
+cd MoviePlex-Platform
 ```
 
 ### 2. Tạo file `.env`
