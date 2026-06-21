@@ -2,137 +2,25 @@
 session_start();
 if (empty($_SESSION['user_id'])) { header('Location: /fe/pages/login.php'); exit; }
 require_once __DIR__ . '/../../be/config/db.php';
+require_once __DIR__ . '/../../be/services/UserService.php';
 
 $uid = $_SESSION['user_id'];
 $active_page = 'tickets';
 $tab = $_GET['tab'] ?? 'upcoming';
 
-// Create movie_reviews table if it doesn't exist
-$pdo->query("
-  CREATE TABLE IF NOT EXISTS movie_reviews (
-      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-      user_id INT NOT NULL,
-      movie_id INT UNSIGNED NOT NULL,
-      booking_code VARCHAR(50) NOT NULL,
-      rating INT NOT NULL,
-      comment TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE KEY unique_user_movie_booking (user_id, movie_id, booking_code)
-  ) ENGINE=InnoDB;
-");
+$service = new UserService($pdo);
+$ticketsResult = $service->getMyTickets($uid);
 
-function javascript_escape($str) {
-    return str_replace(["\r", "\n", "'", '"'], ["", "", "\\'", '\\"'], $str);
-}
-
-// Handle Review Submit
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'submit_review') {
-    $bcode = $_POST['booking_code'] ?? '';
-    $rating = (int)($_POST['rating'] ?? 10);
-    $comment = trim($_POST['comment'] ?? '');
-
-    if ($bcode && $rating >= 1 && $rating <= 10) {
-        $bkQuery = $pdo->prepare("
-          SELECT b.showtime_id, s.movie_id 
-          FROM bookings b
-          JOIN showtimes s ON b.showtime_id = s.id
-          WHERE b.booking_code=? AND b.user_id=? LIMIT 1
-        ");
-        $bkQuery->execute([$bcode, $uid]);
-        $bk = $bkQuery->fetch();
-
-        if ($bk) {
-            try {
-                $pdo->beginTransaction();
-                
-                $insReview = $pdo->prepare("
-                  INSERT INTO movie_reviews (user_id, movie_id, booking_code, rating, comment)
-                  VALUES (?, ?, ?, ?, ?)
-                  ON DUPLICATE KEY UPDATE rating=VALUES(rating), comment=VALUES(comment)
-                ");
-                $insReview->execute([$uid, $bk['movie_id'], $bcode, $rating, $comment]);
-
-                $avgQuery = $pdo->prepare("SELECT AVG(rating) FROM movie_reviews WHERE movie_id=?");
-                $avgQuery->execute([$bk['movie_id']]);
-                $newAvg = round($avgQuery->fetchColumn(), 1);
-
-                $updMovie = $pdo->prepare("UPDATE movies SET rating=? WHERE id=?");
-                $updMovie->execute([$newAvg ?: 10.0, $bk['movie_id']]);
-
-                $pdo->commit();
-                $_SESSION['cancel_success'] = "Gửi đánh giá cho phim thành công! Cảm ơn đóng góp của bạn.";
-            } catch (Exception $e) {
-                $pdo->rollBack();
-                $_SESSION['cancel_error'] = "Có lỗi xảy ra khi lưu đánh giá. Vui lòng thử lại.";
-            }
-        }
-    }
-    header("Location: my-tickets.php?tab=past"); exit;
-}
-
-$bookings = $pdo->prepare("
-  SELECT b.*, m.title, m.poster_url, m.duration_min, m.id as movie_id,
-         s.show_date, s.start_time, s.format, s.subtitle_type, s.hall_name,
-         c.name as cinema_name,
-         r.rating as user_rating, r.comment as user_comment
-  FROM bookings b
-  JOIN showtimes s ON b.showtime_id = s.id
-  JOIN movies m ON s.movie_id = m.id
-  JOIN cinemas c ON s.cinema_id = c.id
-  LEFT JOIN movie_reviews r ON b.booking_code = r.booking_code AND b.user_id = r.user_id
-  WHERE b.user_id = ?
-  ORDER BY b.created_at DESC
-");
-$bookings->execute([$uid]);
-$all = $bookings->fetchAll();
-
-$upcoming  = array_filter($all, fn($b) => $b['status'] !== 'cancelled' && strtotime($b['show_date'] . ' ' . $b['start_time']) >= time());
-$past      = array_filter($all, fn($b) => $b['status'] !== 'cancelled' && strtotime($b['show_date'] . ' ' . $b['start_time']) < time());
-$cancelled = array_filter($all, fn($b) => $b['status'] === 'cancelled');
+$upcoming  = $ticketsResult['upcoming'];
+$past      = $ticketsResult['past'];
+$cancelled = $ticketsResult['cancelled'];
 
 $statusLabel = ['confirmed'=>'Đã xác nhận','cancelled'=>'Đã hủy','checked_in'=>'Đã check-in'];
 $statusColor = ['confirmed'=>'#22C55E','cancelled'=>'#EF4444','checked_in'=>'#2563EB'];
 $payLabels   = ['momo'=>'MoMo','vnpay'=>'VNPay','zalopay'=>'ZaloPay','cash'=>'Tiền mặt'];
 
-// Handle cancel
-if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['action']??'')==='cancel') {
-    $bcode = $_POST['booking_code'] ?? '';
-    if ($bcode) {
-        $check = $pdo->prepare("
-          SELECT b.*, s.show_date, s.start_time
-          FROM bookings b
-          JOIN showtimes s ON b.showtime_id = s.id
-          WHERE b.booking_code=? AND b.user_id=? AND b.status='confirmed' LIMIT 1
-        ");
-        $check->execute([$bcode, $uid]);
-        $bk = $check->fetch();
-        if ($bk) {
-            $showtime_dt = strtotime($bk['show_date'] . ' ' . $bk['start_time']);
-            $minutes_left = ($showtime_dt - time()) / 60;
-            if ($minutes_left >= 60) {
-                try {
-                    $pdo->beginTransaction();
-                    $pdo->prepare("UPDATE bookings SET status='cancelled', cancel_reason=NULL, payment_status='refunded' WHERE booking_code=?")->execute([$bcode]);
-                    $pdo->prepare("UPDATE showtimes SET available_seats=available_seats+? WHERE id=?")->execute([$bk['num_tickets'], $bk['showtime_id']]);
-                    
-                    if ($bk['voucher_code']) {
-                        $pdo->prepare("UPDATE vouchers SET used_count=GREATEST(0, used_count-1) WHERE code=?")->execute([$bk['voucher_code']]);
-                    }
-
-                    // Không trừ điểm lúc hủy vé nữa, vì điểm chỉ được cộng sau khi xem xong.
-
-                    $pdo->commit();
-                    $_SESSION['cancel_success'] = "Đã hủy vé $bcode thành công! Số tiền " . number_format($bk['total_amount'],0,',','.') . "₫ đã được hoàn trả về tài khoản nguồn (" . strtoupper($bk['payment_method']) . ").";
-                } catch (Exception $e) {
-                    $pdo->rollBack();
-                    $_SESSION['cancel_error'] = "Có lỗi xảy ra khi hoàn vé. Vui lòng thử lại.";
-                }
-            } else {
-                $_SESSION['cancel_error'] = "Không thể hủy vé này do đã quá hạn thời gian cho phép (tối thiểu trước giờ chiếu 60 phút).";
-            }
-        }
-    }
-    header('Location: my-tickets.php?tab=cancelled'); exit;
+function javascript_escape($str) {
+    return str_replace(["\r", "\n", "'", '"'], ["", "", "\\'", '\\"'], $str);
 }
 ?>
 <!DOCTYPE html>
@@ -178,6 +66,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 .btn-sm-red{background:#FEF2F2;color:#EF4444;border:1px solid #FECACA}
 .btn-sm-red:hover{background:#FEE2E2}
 .btn-sm-gray{background:var(--card);color:var(--muted);border:1px solid var(--border)}
+.btn-sm:disabled{opacity:.6;cursor:not-allowed}
 .bk-price{font-size:16px;font-weight:800;color:var(--blue)}
 /* EMPTY */
 .empty{text-align:center;padding:60px 20px;color:var(--muted)}
@@ -191,6 +80,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 .modal p{font-size:14px;color:var(--muted);margin-bottom:22px}
 .modal-btns{display:flex;gap:10px}
 .mbtn{flex:1;height:42px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;border:none;font-family:inherit;transition:all .2s}
+.mbtn:disabled{opacity:.6;cursor:not-allowed}
 .mbtn-cancel{background:var(--bg);color:var(--text)}
 .mbtn-confirm{background:#EF4444;color:#fff}
 
@@ -206,21 +96,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 <div class="main">
   <div class="topbar"><h1><i class="fa-solid fa-receipt" style="color:var(--blue);margin-right:8px"></i>Vé của tôi</h1></div>
   <div class="content">
-    <?php if(isset($_SESSION['cancel_success'])): ?>
-      <div class="alert alert-success">
-        <i class="fa-solid fa-circle-check"></i>
-        <span><?= $_SESSION['cancel_success'] ?></span>
-      </div>
-      <?php unset($_SESSION['cancel_success']); ?>
-    <?php endif; ?>
-
-    <?php if(isset($_SESSION['cancel_error'])): ?>
-      <div class="alert alert-error">
-        <i class="fa-solid fa-circle-exclamation"></i>
-        <span><?= $_SESSION['cancel_error'] ?></span>
-      </div>
-      <?php unset($_SESSION['cancel_error']); ?>
-    <?php endif; ?>
+    <div id="alert-box"></div>
 
     <div class="tabs">
       <a class="tab <?= $tab==='upcoming'?'active':'' ?>" href="?tab=upcoming">Sắp chiếu (<?= count($upcoming) ?>)</a>
@@ -335,12 +211,12 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
       <div style="display:flex; justify-content:space-between;"><span style="color:#64748B;">Phương thức hoàn:</span><strong id="m-method" style="color:#2563EB;"></strong></div>
     </div>
 
-    <form method="POST" id="cancel-form">
-      <input type="hidden" name="action" value="cancel">
+    <form id="cancel-form">
+      <input type="hidden" name="action" value="cancel_booking">
       <input type="hidden" name="booking_code" id="cancel-code">
       <div class="modal-btns">
         <button type="button" class="mbtn mbtn-cancel" onclick="closeCancel()" style="background:#F1F5F9; color:#475569;">Không, giữ lại</button>
-        <button type="submit" class="mbtn mbtn-confirm" style="background:#EF4444; color:#fff;">Xác nhận hủy vé</button>
+        <button type="submit" class="mbtn mbtn-confirm" id="btn-confirm-cancel" style="background:#EF4444; color:#fff;">Xác nhận hủy vé</button>
       </div>
     </form>
   </div>
@@ -355,7 +231,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
     <h3 style="font-size: 18px; font-weight: 800; color: #0F172A; margin-bottom: 4px;">Đánh giá phim</h3>
     <p id="rev-movie-title" style="font-size: 14px; font-weight: 700; color: var(--blue); margin-bottom: 20px;"></p>
     
-    <form method="POST" id="review-form">
+    <form id="review-form">
       <input type="hidden" name="action" value="submit_review">
       <input type="hidden" name="booking_code" id="rev-booking-code">
       
@@ -379,13 +255,22 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 
       <div class="modal-btns">
         <button type="button" class="mbtn mbtn-cancel" onclick="closeReview()" style="background:#F1F5F9; color:#475569;">Đóng</button>
-        <button type="submit" class="mbtn mbtn-confirm" style="background:#10B981; color:#fff;">Gửi đánh giá</button>
+        <button type="submit" class="mbtn mbtn-confirm" id="btn-submit-review" style="background:#10B981; color:#fff;">Gửi đánh giá</button>
       </div>
     </form>
   </div>
 </div>
 
 <script>
+const USER_ENDPOINT = '/be/controllers/UserController.php';
+
+function showAlert(type, message) {
+  const box = document.getElementById('alert-box');
+  const icon = type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation';
+  box.innerHTML = `<div class="alert alert-${type}"><i class="fa-solid ${icon}"></i><span>${message}</span></div>`;
+  box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function confirmCancel(code, amount, points, method) {
   document.getElementById('cancel-code').value = code;
   document.getElementById('m-code').textContent = code;
@@ -394,6 +279,35 @@ function confirmCancel(code, amount, points, method) {
   document.getElementById('cancel-overlay').classList.add('show');
 }
 function closeCancel() { document.getElementById('cancel-overlay').classList.remove('show'); }
+
+// CANCEL BOOKING SUBMIT
+document.getElementById('cancel-form').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const btn = document.getElementById('btn-confirm-cancel');
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...';
+
+  const fd = new FormData(this);
+
+  try {
+    const r = await fetch(USER_ENDPOINT, { method: 'POST', body: fd });
+    const d = await r.json();
+    closeCancel();
+    if (d.success) {
+      showAlert('success', d.message);
+      setTimeout(() => location.href = 'my-tickets.php?tab=cancelled', 1200);
+    } else {
+      showAlert('error', d.message);
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  } catch {
+    showAlert('error', 'Lỗi kết nối. Vui lòng thử lại.');
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+  }
+});
 
 const starLabels = {
   1: "Tệ hại", 2: "Rất tệ", 3: "Kém", 4: "Trung bình kém", 
@@ -426,6 +340,35 @@ function openReview(code, title, rating, comment) {
 function closeReview() {
   document.getElementById('review-overlay').classList.remove('show');
 }
+
+// SUBMIT REVIEW
+document.getElementById('review-form').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const btn = document.getElementById('btn-submit-review');
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang gửi...';
+
+  const fd = new FormData(this);
+
+  try {
+    const r = await fetch(USER_ENDPOINT, { method: 'POST', body: fd });
+    const d = await r.json();
+    closeReview();
+    if (d.success) {
+      showAlert('success', d.message);
+      setTimeout(() => location.reload(), 1200);
+    } else {
+      showAlert('error', d.message);
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  } catch {
+    showAlert('error', 'Lỗi kết nối. Vui lòng thử lại.');
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+  }
+});
 
 async function logout(){
   const fd=new FormData();fd.append('action','logout');
