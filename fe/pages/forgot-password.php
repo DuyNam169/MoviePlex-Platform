@@ -1,100 +1,19 @@
 <?php
-session_start();
-require_once __DIR__ . '/../../be/config/db.php';
+/**
+ * fe/pages/forgot-password.php
+ *
+ * Pure presentation layer. No DB access, no business logic.
+ * All actions are sent via JS fetch() to ForgotPasswordController.php.
+ *
+ * Step state is stored in $_SESSION by ForgotPasswordController on the BE side.
+ * This page reads $_SESSION['pwd_step'] only to decide which step UI to render.
+ */
 
-// Auto create table if not exists
-$pdo->exec("
-  CREATE TABLE IF NOT EXISTS password_resets (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      email VARCHAR(150) NOT NULL,
-      token VARCHAR(10) NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      expires_at DATETIME NOT NULL
-  ) ENGINE=InnoDB;
-");
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 $step = $_SESSION['pwd_step'] ?? 1;
-$error = '';
-$success = '';
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
-    
-    // STEP 1: Send OTP to Email
-    if ($action === 'send_otp') {
-        $email = trim($_POST['email'] ?? '');
-        $stmt = $pdo->prepare("SELECT id, full_name FROM users WHERE email = ? LIMIT 1");
-        $stmt->execute([$email]);
-        $user = $stmt->fetch();
-        
-        if ($user) {
-            $otp = sprintf("%06d", mt_rand(1, 999999));
-            $expires = date('Y-m-d H:i:s', strtotime('+15 minutes'));
-            
-            // Delete old OTPs for this email
-            $pdo->prepare("DELETE FROM password_resets WHERE email = ?")->execute([$email]);
-            
-            // Insert new OTP
-            $pdo->prepare("INSERT INTO password_resets (email, token, expires_at) VALUES (?, ?, ?)")->execute([$email, $otp, $expires]);
-
-            // ========================================================
-            // CHẾ ĐỘ LOCAL (KHÔNG CÓ MẠNG / KHÔNG CẦN CẤU HÌNH SMTP)
-            // ========================================================
-            // Thay vì gửi email thật (cần mạng và cấu hình phức tạp), 
-            // ta sẽ hiển thị trực tiếp mã OTP lên màn hình để dễ test.
-            
-            $_SESSION['pwd_step'] = 2;
-            $_SESSION['pwd_email'] = $email;
-            
-            // Hiển thị mã OTP thẳng lên giao diện (Dành cho báo cáo/demo local)
-            $success = "Đã giả lập gửi Email! (DEV MODE) Mã OTP của bạn là: " . $otp;
-            $step = 2;
-        } else {
-            $error = "Không tìm thấy tài khoản nào với địa chỉ email này.";
-        }
-    }
-    
-    // STEP 2: Verify OTP
-    elseif ($action === 'verify_otp') {
-        $otp = trim($_POST['otp'] ?? '');
-        $email = $_SESSION['pwd_email'] ?? '';
-        
-        $stmt = $pdo->prepare("SELECT * FROM password_resets WHERE email = ? AND token = ? AND expires_at > NOW() LIMIT 1");
-        $stmt->execute([$email, $otp]);
-        
-        if ($stmt->fetch()) {
-            $_SESSION['pwd_step'] = 3;
-            $_SESSION['pwd_otp'] = $otp; // verified
-            $step = 3;
-        } else {
-            $error = "Mã OTP không chính xác hoặc đã hết hạn.";
-        }
-    }
-    
-    // STEP 3: Reset Password
-    elseif ($action === 'reset_pwd') {
-        $pwd1 = $_POST['new_pwd'] ?? '';
-        $pwd2 = $_POST['confirm_pwd'] ?? '';
-        $email = $_SESSION['pwd_email'] ?? '';
-        
-        if (strlen($pwd1) < 6) {
-            $error = "Mật khẩu mới phải có ít nhất 6 ký tự.";
-        } elseif ($pwd1 !== $pwd2) {
-            $error = "Mật khẩu xác nhận không khớp.";
-        } else {
-            $hash = password_hash($pwd1, PASSWORD_DEFAULT);
-            $pdo->prepare("UPDATE users SET password_hash = ? WHERE email = ?")->execute([$hash, $email]);
-            $pdo->prepare("DELETE FROM password_resets WHERE email = ?")->execute([$email]);
-            
-            // Clear session
-            unset($_SESSION['pwd_step'], $_SESSION['pwd_email'], $_SESSION['pwd_otp']);
-            
-            $_SESSION['login_success'] = "Đổi mật khẩu thành công! Vui lòng đăng nhập bằng mật khẩu mới.";
-            header("Location: /fe/pages/login.php");
-            exit;
-        }
-    }
-}
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -120,13 +39,21 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .frm-inp{width:100%;height:46px;border:1.5px solid var(--border);border-radius:10px;padding:0 14px;font-size:14px;font-family:inherit;transition:all .2s;background:#F8FAFC}
 .frm-inp:focus{border-color:var(--blue);background:#fff;outline:none;box-shadow:0 0 0 4px rgba(37,99,235,.1)}
 .btn-submit{width:100%;height:46px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px}
-.btn-submit:hover{background:#1D4ED8;transform:translateY(-1px);box-shadow:0 4px 12px rgba(37,99,235,.2)}
-.alert{padding:12px 16px;border-radius:8px;font-size:13.5px;font-weight:500;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+.btn-submit:hover:not(:disabled){background:#1D4ED8;transform:translateY(-1px);box-shadow:0 4px 12px rgba(37,99,235,.2)}
+.btn-submit:disabled{opacity:.5;cursor:not-allowed}
+.btn-submit .spin{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .65s linear infinite;display:none}
+.btn-submit.loading .spin{display:block}
+.btn-submit.loading .bt{display:none}
+@keyframes sp{to{transform:rotate(360deg)}}
+.alert{padding:12px 16px;border-radius:8px;font-size:13.5px;font-weight:500;margin-bottom:20px;display:none;align-items:center;gap:8px}
+.alert.show{display:flex}
 .alert-err{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}
 .alert-succ{background:#F0FDF4;color:#16A34A;border:1px solid #BBF7D0}
 .auth-footer{margin-top:24px;text-align:center;font-size:14px;color:var(--muted)}
 .auth-footer a{color:var(--blue);text-decoration:none;font-weight:600;transition:color .2s}
 .auth-footer a:hover{color:#1D4ED8}
+.btn-resend{background:none;border:none;color:var(--blue);font-weight:600;cursor:pointer;font-family:inherit;font-size:14px;padding:0}
+.btn-resend:hover{text-decoration:underline}
 </style>
 </head>
 <body>
@@ -137,65 +64,189 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="logo-name">MovieFlex</div>
   </a>
 
-  <?php if($error): ?>
-    <div class="alert alert-err"><i class="fa-solid fa-circle-exclamation"></i> <?= htmlspecialchars($error) ?></div>
-  <?php endif; ?>
-  <?php if($success): ?>
-    <div class="alert alert-succ"><i class="fa-solid fa-circle-check"></i> <?= htmlspecialchars($success) ?></div>
-  <?php endif; ?>
+  <div id="msg" class="alert"></div>
 
-  <?php if($step === 1): ?>
+  <!-- STEP 1: Enter email -->
+  <div id="s1" style="display:<?= $step === 1 ? 'block' : 'none' ?>">
     <h1 class="auth-title">Quên mật khẩu</h1>
-    <p class="auth-desc">Nhập địa chỉ email đăng ký tài khoản của bạn. Chúng tôi sẽ gửi một mã OTP gồm 6 chữ số để đặt lại mật khẩu.</p>
-    <form method="POST">
-      <input type="hidden" name="action" value="send_otp">
-      <div class="frm-grp">
-        <label class="frm-lbl">Địa chỉ Email</label>
-        <input type="email" name="email" class="frm-inp" placeholder="VD: nguyenvanan@gmail.com" required>
-      </div>
-      <button type="submit" class="btn-submit"><i class="fa-solid fa-paper-plane"></i> Gửi mã xác nhận</button>
-    </form>
-  
-  <?php elseif($step === 2): ?>
-    <h1 class="auth-title">Nhập mã OTP</h1>
-    <p class="auth-desc">Mã OTP gồm 6 chữ số đã được "gửi giả lập" tới <b><?= htmlspecialchars($_SESSION['pwd_email']) ?></b>.<br><i>(Hãy nhìn thông báo màu xanh ở trên để lấy mã OTP nhé)</i></p>
-    <form method="POST">
-      <input type="hidden" name="action" value="verify_otp">
-      <div class="frm-grp">
-        <label class="frm-lbl">Mã OTP (6 chữ số)</label>
-        <input type="text" name="otp" class="frm-inp" placeholder="VD: 123456" maxlength="6" required style="letter-spacing:4px; font-size:18px; font-weight:700; text-align:center">
-      </div>
-      <button type="submit" class="btn-submit"><i class="fa-solid fa-check-circle"></i> Xác thực mã</button>
-    </form>
-    <div class="auth-footer" style="margin-top:16px">
-      <form method="POST" style="display:inline">
-        <input type="hidden" name="action" value="send_otp">
-        <input type="hidden" name="email" value="<?= htmlspecialchars($_SESSION['pwd_email']) ?>">
-        Chưa nhận được mã? <button type="submit" style="background:none;border:none;color:var(--blue);font-weight:600;cursor:pointer;font-family:inherit;font-size:14px">Gửi lại</button>
-      </form>
+    <p class="auth-desc">Nhập địa chỉ email đăng ký tài khoản. Chúng tôi sẽ gửi mã OTP gồm 6 chữ số để đặt lại mật khẩu.</p>
+    <div class="frm-grp">
+      <label class="frm-lbl">Địa chỉ Email</label>
+      <input type="email" id="inp-email" class="frm-inp" placeholder="VD: nguyenvanan@gmail.com">
     </div>
+    <button class="btn-submit" id="btn-s1">
+      <div class="spin"></div>
+      <span class="bt"><i class="fa-solid fa-paper-plane"></i> Gửi mã xác nhận</span>
+    </button>
+  </div>
 
-  <?php elseif($step === 3): ?>
+  <!-- STEP 2: Enter OTP -->
+  <div id="s2" style="display:<?= $step === 2 ? 'block' : 'none' ?>">
+    <h1 class="auth-title">Nhập mã OTP</h1>
+    <p class="auth-desc" id="otp-desc">Mã OTP gồm 6 chữ số đã được gửi tới email của bạn.</p>
+    <div class="frm-grp">
+      <label class="frm-lbl">Mã OTP (6 chữ số)</label>
+      <input type="text" id="inp-otp" class="frm-inp" placeholder="123456" maxlength="6" style="letter-spacing:4px;font-size:18px;font-weight:700;text-align:center">
+    </div>
+    <button class="btn-submit" id="btn-s2">
+      <div class="spin"></div>
+      <span class="bt"><i class="fa-solid fa-check-circle"></i> Xác thực mã</span>
+    </button>
+    <div style="margin-top:16px;text-align:center;font-size:14px;color:var(--muted)">
+      Chưa nhận được mã? <button class="btn-resend" id="btn-resend">Gửi lại</button>
+    </div>
+  </div>
+
+  <!-- STEP 3: New password -->
+  <div id="s3" style="display:<?= $step === 3 ? 'block' : 'none' ?>">
     <h1 class="auth-title">Đặt mật khẩu mới</h1>
     <p class="auth-desc">Vui lòng tạo một mật khẩu mới cho tài khoản của bạn.</p>
-    <form method="POST">
-      <input type="hidden" name="action" value="reset_pwd">
-      <div class="frm-grp">
-        <label class="frm-lbl">Mật khẩu mới</label>
-        <input type="password" name="new_pwd" class="frm-inp" placeholder="Ít nhất 6 ký tự" required minlength="6">
-      </div>
-      <div class="frm-grp">
-        <label class="frm-lbl">Xác nhận mật khẩu</label>
-        <input type="password" name="confirm_pwd" class="frm-inp" placeholder="Nhập lại mật khẩu mới" required minlength="6">
-      </div>
-      <button type="submit" class="btn-submit"><i class="fa-solid fa-lock"></i> Đổi mật khẩu</button>
-    </form>
-  <?php endif; ?>
+    <div class="frm-grp">
+      <label class="frm-lbl">Mật khẩu mới</label>
+      <input type="password" id="inp-pw1" class="frm-inp" placeholder="Ít nhất 6 ký tự">
+    </div>
+    <div class="frm-grp">
+      <label class="frm-lbl">Xác nhận mật khẩu</label>
+      <input type="password" id="inp-pw2" class="frm-inp" placeholder="Nhập lại mật khẩu mới">
+    </div>
+    <button class="btn-submit" id="btn-s3">
+      <div class="spin"></div>
+      <span class="bt"><i class="fa-solid fa-lock"></i> Đổi mật khẩu</span>
+    </button>
+  </div>
 
   <div class="auth-footer">
     <a href="/fe/pages/login.php"><i class="fa-solid fa-arrow-left"></i> Quay lại đăng nhập</a>
   </div>
 </div>
 
+<script>
+const ENDPOINT = '/be/controllers/ForgotPasswordController.php';
+
+function showMsg(type, text) {
+  const el = document.getElementById('msg');
+  el.className = `alert alert-${type} show`;
+  el.innerHTML = `<i class="fa-solid ${type === 'err' ? 'fa-circle-exclamation' : 'fa-circle-check'}"></i> ${text}`;
+}
+
+function hideMsg() {
+  document.getElementById('msg').className = 'alert';
+}
+
+function setLoad(btnId, on) {
+  const b = document.getElementById(btnId);
+  b.classList.toggle('loading', on);
+  b.disabled = on;
+}
+
+function goStep(n) {
+  document.getElementById('s1').style.display = n === 1 ? 'block' : 'none';
+  document.getElementById('s2').style.display = n === 2 ? 'block' : 'none';
+  document.getElementById('s3').style.display = n === 3 ? 'block' : 'none';
+  hideMsg();
+}
+
+// STEP 1: Send OTP
+document.getElementById('btn-s1').addEventListener('click', async () => {
+  const email = document.getElementById('inp-email').value.trim();
+  if (!email) { showMsg('err', 'Vui lòng nhập địa chỉ email.'); return; }
+
+  setLoad('btn-s1', true);
+  hideMsg();
+
+  const fd = new FormData();
+  fd.append('action', 'send_otp');
+  fd.append('email', email);
+
+  try {
+    const r = await fetch(ENDPOINT, { method: 'POST', body: fd });
+    const d = await r.json();
+
+    if (d.success) {
+      // DEV MODE: show OTP on screen. Remove this block in production.
+      if (d.dev_otp) {
+        showMsg('succ', `(DEV MODE) Mã OTP của bạn là: <strong>${d.dev_otp}</strong>`);
+      } else {
+        showMsg('succ', 'Mã OTP đã được gửi tới email của bạn.');
+      }
+      document.getElementById('otp-desc').textContent = `Mã OTP gồm 6 chữ số đã được gửi tới ${email}.`;
+      setTimeout(() => goStep(2), 1500);
+    } else {
+      showMsg('err', d.message);
+    }
+  } catch {
+    showMsg('err', 'Lỗi kết nối. Vui lòng thử lại.');
+  } finally {
+    setLoad('btn-s1', false);
+  }
+});
+
+// STEP 2: Verify OTP
+document.getElementById('btn-s2').addEventListener('click', async () => {
+  const otp = document.getElementById('inp-otp').value.trim();
+  if (!otp || otp.length !== 6) { showMsg('err', 'Vui lòng nhập đúng 6 chữ số.'); return; }
+
+  setLoad('btn-s2', true);
+  hideMsg();
+
+  const fd = new FormData();
+  fd.append('action', 'verify_otp');
+  fd.append('otp', otp);
+
+  try {
+    const r = await fetch(ENDPOINT, { method: 'POST', body: fd });
+    const d = await r.json();
+
+    if (d.success) {
+      showMsg('succ', 'Xác thực thành công!');
+      setTimeout(() => goStep(3), 800);
+    } else {
+      showMsg('err', d.message);
+    }
+  } catch {
+    showMsg('err', 'Lỗi kết nối. Vui lòng thử lại.');
+  } finally {
+    setLoad('btn-s2', false);
+  }
+});
+
+// STEP 2: Resend OTP
+document.getElementById('btn-resend').addEventListener('click', () => {
+  goStep(1);
+});
+
+// STEP 3: Reset password
+document.getElementById('btn-s3').addEventListener('click', async () => {
+  const pw1 = document.getElementById('inp-pw1').value;
+  const pw2 = document.getElementById('inp-pw2').value;
+
+  if (pw1.length < 6) { showMsg('err', 'Mật khẩu mới phải có ít nhất 6 ký tự.'); return; }
+  if (pw1 !== pw2)    { showMsg('err', 'Mật khẩu xác nhận không khớp.'); return; }
+
+  setLoad('btn-s3', true);
+  hideMsg();
+
+  const fd = new FormData();
+  fd.append('action', 'reset_pwd');
+  fd.append('new_pwd', pw1);
+  fd.append('confirm_pwd', pw2);
+
+  try {
+    const r = await fetch(ENDPOINT, { method: 'POST', body: fd });
+    const d = await r.json();
+
+    if (d.success) {
+      showMsg('succ', d.message);
+      setTimeout(() => location.href = '/fe/pages/login.php', 1500);
+    } else {
+      showMsg('err', d.message);
+    }
+  } catch {
+    showMsg('err', 'Lỗi kết nối. Vui lòng thử lại.');
+  } finally {
+    setLoad('btn-s3', false);
+  }
+});
+</script>
 </body>
 </html>
