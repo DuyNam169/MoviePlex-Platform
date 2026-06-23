@@ -59,7 +59,7 @@ Xem chi tiết từng thành phần tại [PROJECT_STRUCTURE.md](./PROJECT_STRUC
 ### 1. Clone project
 
 ```bash
-git clone https://github.com/ducphat-123/Qualyrapchieuphim.git
+git clone https://github.com/DuyNam169/MoviePlex-Platform
 cd MoviePlex-Platform
 ```
 

@@ -1,48 +1,10 @@
 <?php
-$active_page = 'help';
-require_once __DIR__ . '/../../be/config/db.php';
 session_start();
+$active_page = 'help';
 
-$message = '';
-$messageType = '';
-
-// Handle Support Ticket submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'submit_ticket') {
-    $name = trim($_POST['fullname'] ?? '');
-    $email = trim($_POST['email'] ?? '');
-    $phone = trim($_POST['phone'] ?? '');
-    $subject = trim($_POST['subject'] ?? '');
-    $content = trim($_POST['content'] ?? '');
-
-    if ($name && $email && $subject && $content) {
-        // Since we don't have a support table yet, let's create it if it doesn't exist, or just insert.
-        // Let's check or create a table 'support_tickets' for clean architecture
-        try {
-            $pdo->query("CREATE TABLE IF NOT EXISTS support_tickets (
-                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                fullname VARCHAR(150) NOT NULL,
-                email VARCHAR(150) NOT NULL,
-                phone VARCHAR(20) DEFAULT NULL,
-                subject VARCHAR(200) NOT NULL,
-                content TEXT NOT NULL,
-                status ENUM('pending', 'in_progress', 'resolved') DEFAULT 'pending',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB");
-
-            $stmt = $pdo->prepare("INSERT INTO support_tickets (fullname, email, phone, subject, content) VALUES (?, ?, ?, ?, ?)");
-            $stmt->execute([$name, $email, $phone ?: null, $subject, $content]);
-
-            $message = 'Yêu cầu hỗ trợ của bạn đã được gửi đi! Chúng tôi sẽ phản hồi qua email trong vòng 24h.';
-            $messageType = 'success';
-        } catch (Exception $e) {
-            $message = 'Đã có lỗi xảy ra. Vui lòng thử lại sau.';
-            $messageType = 'error';
-        }
-    } else {
-        $message = 'Vui lòng điền đầy đủ các thông tin bắt buộc.';
-        $messageType = 'error';
-    }
-}
+// Pre-fill form nếu đã đăng nhập (fix bug $_userName/$_userEmail chưa định nghĩa)
+$_userName  = $_SESSION['user_name']  ?? '';
+$_userEmail = $_SESSION['user_email'] ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -108,7 +70,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 .faq-arrow{font-size:12px;color:var(--muted);transition:transform .2s}
 .faq-body{max-height:0;overflow:hidden;transition:max-height .25s ease-out;background:var(--card)}
 .faq-content{padding:16px 20px;font-size:13px;color:var(--muted);line-height:1.6;border-top:1px solid var(--border)}
-.faq-item.active .faq-arrow{transform:rotate(180px)}
+.faq-item.active .faq-arrow{transform:rotate(180deg)}
 .faq-item.active{border-color:var(--blue);box-shadow:0 4px 12px rgba(37,99,235,.05)}
 
 /* FORM SECTION */
@@ -119,7 +81,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 .form-control:focus{border-color:var(--blue)}
 textarea.form-control{resize:vertical;min-height:100px}
 .btn-submit{width:100%;height:42px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .2s}
-.btn-submit:hover{background:#1D4ED8}
+.btn-submit:hover:not(:disabled){background:#1D4ED8}
+.btn-submit:disabled{opacity:.6;cursor:not-allowed}
 
 /* CONTACT CARD */
 .contact-card{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:20px;position:sticky;top:88px}
@@ -134,7 +97,8 @@ textarea.form-control{resize:vertical;min-height:100px}
 .social-btn:hover{border-color:var(--blue);color:var(--blue);background:#EFF6FF}
 
 /* ALERTS */
-.alert{border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:16px;display:flex;align-items:center;gap:8px;line-height:1.4}
+.alert{border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:16px;display:none;align-items:center;gap:8px;line-height:1.4}
+.alert.show{display:flex}
 .alert-success{background:#F0FDF4;color:#166534;border:1px solid #BBF7D0}
 .alert-error{background:#FEF2F2;color:#991B1B;border:1px solid #FEE2E2}
 
@@ -154,12 +118,10 @@ textarea.form-control{resize:vertical;min-height:100px}
 
 <!-- MAIN -->
 <div class="main">
-  <!-- TOPBAR -->
   <div class="topbar">
     <h1><i class="fa-regular fa-circle-question" style="color:var(--blue);margin-right:8px"></i>Trợ giúp & Hỗ trợ</h1>
   </div>
 
-  <!-- CONTENT -->
   <div class="content">
     
     <!-- SEARCH HERO -->
@@ -277,15 +239,10 @@ textarea.form-control{resize:vertical;min-height:100px}
           <h2>Gửi yêu cầu hỗ trợ trực tuyến</h2>
         </div>
         
-        <?php if ($message): ?>
-          <div class="alert alert-<?= $messageType ?>">
-            <i class="fa-solid fa-<?= $messageType==='success'?'circle-check':'circle-exclamation' ?>"></i>
-            <?= htmlspecialchars($message) ?>
-          </div>
-        <?php endif; ?>
+        <div id="alert-box"></div>
 
-        <form method="POST">
-          <input type="hidden" name="action" value="submit_ticket">
+        <form id="support-form">
+          <input type="hidden" name="action" value="submit_support_ticket">
           <div class="fg">
             <label>Họ và tên <span>*</span></label>
             <input type="text" name="fullname" class="form-control" placeholder="Nhập đầy đủ họ tên..." required value="<?= htmlspecialchars($_userName) ?>">
@@ -308,7 +265,7 @@ textarea.form-control{resize:vertical;min-height:100px}
             <label>Nội dung chi tiết <span>*</span></label>
             <textarea name="content" class="form-control" placeholder="Mô tả cụ thể vấn đề hoặc câu hỏi của bạn để chúng tôi hỗ trợ tốt nhất..." required></textarea>
           </div>
-          <button type="submit" class="btn-submit">
+          <button type="submit" class="btn-submit" id="btn-submit">
             <i class="fa-regular fa-paper-plane"></i> Gửi yêu cầu hỗ trợ
           </button>
         </form>
@@ -361,11 +318,43 @@ textarea.form-control{resize:vertical;min-height:100px}
 </div>
 
 <script>
+const USER_ENDPOINT = '/be/controllers/UserController.php';
+
+// ── Support Ticket Form ──
+document.getElementById('support-form').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const btn = document.getElementById('btn-submit');
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang gửi...';
+
+  const fd = new FormData(this);
+
+  try {
+    const r = await fetch(USER_ENDPOINT, { method: 'POST', body: fd });
+    const d = await r.json();
+    showAlert(d.success ? 'success' : 'error', d.message);
+    if (d.success) this.reset();
+  } catch {
+    showAlert('error', 'Lỗi kết nối. Vui lòng thử lại.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+  }
+});
+
+function showAlert(type, message) {
+  const box = document.getElementById('alert-box');
+  const icon = type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation';
+  box.innerHTML = `<div class="alert alert-${type} show"><i class="fa-solid ${icon}"></i>${message}</div>`;
+  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ── FAQ Accordion ──
 function toggleFaq(header) {
   const item = header.parentElement;
   const body = header.nextElementSibling;
   
-  // Collapse others
   document.querySelectorAll('.faq-item').forEach(x => {
     if (x !== item && x.classList.contains('active')) {
       x.classList.remove('active');
@@ -374,30 +363,20 @@ function toggleFaq(header) {
   });
 
   item.classList.toggle('active');
-  if (item.classList.contains('active')) {
-    body.style.maxHeight = body.scrollHeight + "px";
-  } else {
-    body.style.maxHeight = null;
-  }
+  body.style.maxHeight = item.classList.contains('active') ? body.scrollHeight + 'px' : null;
 }
 
 function filterFaqs() {
   const query = document.getElementById('search-faq').value.toLowerCase().trim();
-  const items = document.querySelectorAll('.faq-item');
-  
-  items.forEach(item => {
-    const title = item.querySelector('.faq-title').textContent.toLowerCase();
+  document.querySelectorAll('.faq-item').forEach(item => {
+    const title   = item.querySelector('.faq-title').textContent.toLowerCase();
     const content = item.querySelector('.faq-content').textContent.toLowerCase();
-    const tags = item.dataset.tags.toLowerCase();
-    
-    if (title.includes(query) || content.includes(query) || tags.includes(query)) {
-      item.style.display = 'block';
-    } else {
-      item.style.display = 'none';
-      if (item.classList.contains('active')) {
-        item.classList.remove('active');
-        item.querySelector('.faq-body').style.maxHeight = null;
-      }
+    const tags    = item.dataset.tags.toLowerCase();
+    const match   = title.includes(query) || content.includes(query) || tags.includes(query);
+    item.style.display = match ? 'block' : 'none';
+    if (!match && item.classList.contains('active')) {
+      item.classList.remove('active');
+      item.querySelector('.faq-body').style.maxHeight = null;
     }
   });
 }
@@ -405,14 +384,10 @@ function filterFaqs() {
 function setSearch(term) {
   document.getElementById('search-faq').value = term;
   filterFaqs();
-  // Open the first matching FAQ automatically
   setTimeout(() => {
-    const visibleFaqs = Array.from(document.querySelectorAll('.faq-item')).filter(x => x.style.display !== 'none');
-    if (visibleFaqs.length > 0) {
-      const header = visibleFaqs[0].querySelector('.faq-header');
-      if (!visibleFaqs[0].classList.contains('active')) {
-        toggleFaq(header);
-      }
+    const visible = Array.from(document.querySelectorAll('.faq-item')).filter(x => x.style.display !== 'none');
+    if (visible.length > 0 && !visible[0].classList.contains('active')) {
+      toggleFaq(visible[0].querySelector('.faq-header'));
     }
   }, 100);
 }
