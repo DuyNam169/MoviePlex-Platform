@@ -4,7 +4,7 @@ require_once __DIR__ . '/../../be/config/db.php';
 
 // Check staff authentication
 if (empty($_SESSION['user_id']) || ($_SESSION['user_role'] !== 'staff' && $_SESSION['user_role'] !== 'admin')) {
-  header('Location: /fe/pages/login.php');
+  header('Location: login.php');
   exit;
 }
 
@@ -1047,7 +1047,7 @@ async function searchTicket() {
   activeTicketObj = null;
 
   try {
-    const res = await fetch(`api-staff.php?action=check_ticket&code=${encodeURIComponent(code)}`);
+    const res = await fetch(`../../be/controllers/StaffController.php?action=check_ticket&code=${encodeURIComponent(code)}`);
     const json = await res.json();
 
     if (json.success) {
@@ -1134,7 +1134,7 @@ async function confirmCheckin() {
   }
 
   try {
-    const res = await fetch('api-staff.php?action=do_checkin', {
+    const res = await fetch('../../be/controllers/StaffController.php?action=do_checkin', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({code: activeTicketCode})
@@ -1167,7 +1167,7 @@ async function loadCounterMovies() {
   list.innerHTML = '<div style="color:var(--muted); padding:20px 0; grid-column:1/-1; text-align:center">Đang tải phim chi nhánh...</div>';
 
   try {
-    const res = await fetch('api-staff.php?action=get_counter_movies');
+    const res = await fetch('../../be/controllers/StaffController.php?action=get_counter_movies');
     const json = await res.json();
 
     if (json.success) {
@@ -1216,7 +1216,7 @@ async function selectCounterMovie(id, title) {
   document.getElementById('c-step-2').style.display = 'block';
 
   try {
-    const res = await fetch(`api-staff.php?action=get_movie_showtimes&movie_id=${id}`);
+    const res = await fetch(`../../be/controllers/StaffController.php?action=get_movie_showtimes&movie_id=${id}`);
     const json = await res.json();
 
     if (json.success) {
@@ -1261,7 +1261,7 @@ async function selectCounterShowtime(id, date, start_time, hall_name) {
   document.getElementById('c-step-3').style.display = 'block';
 
   try {
-    const res = await fetch(`api-staff.php?action=get_showtime_seats&showtime_id=${id}`);
+    const res = await fetch(`../../be/controllers/StaffController.php?action=get_showtime_seats&showtime_id=${id}`);
     const json = await res.json();
 
     if (json.success) {
@@ -1421,7 +1421,7 @@ async function searchMember() {
   }
 
   try {
-    const res = await fetch(`api-staff.php?action=search_customer&query=${encodeURIComponent(val)}`);
+    const res = await fetch(`../../be/controllers/StaffController.php?action=search_customer&query=${encodeURIComponent(val)}`);
     const json = await res.json();
 
     if (json.success) {
@@ -1468,7 +1468,7 @@ async function submitCounterBooking() {
   };
 
   try {
-    const res = await fetch('api-staff.php?action=create_counter_booking', {
+    const res = await fetch('../../be/controllers/StaffController.php?action=create_counter_booking', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(payload)
@@ -1478,7 +1478,7 @@ async function submitCounterBooking() {
     if (json.success) {
       showToast('Lập đơn thành công', `Đơn hàng ${json.booking_code} đã thanh toán thành công!`);
       setTimeout(() => {
-        window.location.href = `/fe/pages/booking-confirm.php?code=${json.booking_code}`;
+        window.location.href = `booking-confirm.php?code=${json.booking_code}`;
       }, 1500);
     } else {
       showToast('Lập đơn thất bại', json.message, 'error');
@@ -1606,7 +1606,7 @@ async function searchPosMember() {
   }
 
   try {
-    const res = await fetch(`api-staff.php?action=search_customer&query=${encodeURIComponent(val)}`);
+    const res = await fetch(`../../be/controllers/StaffController.php?action=search_customer&query=${encodeURIComponent(val)}`);
     const json = await res.json();
 
     if (json.success) {
@@ -1642,13 +1642,13 @@ async function submitPosSnackOrder() {
   // Let's find any showtime in this cinema to hook it up.
   try {
     // 1. Fetch cinema active showtimes to get a valid showtime_id
-    const showRes = await fetch('api-staff.php?action=get_counter_movies');
+    const showRes = await fetch('../../be/controllers/StaffController.php?action=get_counter_movies');
     const showJson = await showRes.json();
     let showtime_id = 0;
     
     if (showJson.success && showJson.data.length > 0) {
       // Find showtimes for first movie
-      const stRes = await fetch(`api-staff.php?action=get_movie_showtimes&movie_id=${showJson.data[0].id}`);
+      const stRes = await fetch(`../../be/controllers/StaffController.php?action=get_movie_showtimes&movie_id=${showJson.data[0].id}`);
       const stJson = await stRes.json();
       if (stJson.success && stJson.data.length > 0) {
         showtime_id = stJson.data[0].id;
@@ -1670,7 +1670,7 @@ async function submitPosSnackOrder() {
       snacks: snacksArr
     };
 
-    const res = await fetch('api-staff.php?action=create_counter_booking', {
+    const res = await fetch('../../be/controllers/StaffController.php?action=create_counter_booking', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(payload)
@@ -1720,10 +1720,10 @@ async function doLogout() {
   const fd = new FormData();
   fd.append('action', 'logout');
   try {
-    const res = await fetch('../../be/controllers/AuthController.php', {method: 'POST', body: fd});
+    const res = await fetch('../../be/api.php', {method: 'POST', body: fd});
     const json = await res.json();
-    window.location.href = json.redirect || '/fe/pages/login.php';
-  } catch(e) { window.location.href = '/fe/pages/login.php'; }
+    window.location.href = json.redirect || 'login.php';
+  } catch(e) { window.location.href = 'login.php'; }
 }
 
 </script>

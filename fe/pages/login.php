@@ -105,7 +105,7 @@ body{font-family:'Inter',sans-serif;margin:0;padding:0;display:flex;height:100vh
   <div class="bg-overlay"></div>
   <div class="particles" id="particles"></div>
   <div class="left-content">
-    <a href="/fe/pages/guest.php" class="brand" style="text-decoration:none;cursor:pointer" title="Xem trang khách">
+    <a href="guest.php" class="brand" style="text-decoration:none;cursor:pointer" title="Xem trang khách">
       <div class="brand-icon"><i class="fa-solid fa-clapperboard"></i></div>
       <div class="brand-name">Movie<span>Flex</span></div>
     </a>
@@ -159,7 +159,7 @@ body{font-family:'Inter',sans-serif;margin:0;padding:0;display:flex;height:100vh
       </div>
       <div class="opts">
         <label class="chk"><input type="checkbox" name="remember"><span>Ghi nhớ đăng nhập</span></label>
-        <a href="/fe/pages/forgot-password.php" class="lnk">Quên mật khẩu?</a>
+        <a href="forgot-password.php" class="lnk">Quên mật khẩu?</a>
       </div>
       <button class="btn" id="bl" type="submit">
         <div class="spin"></div>
@@ -229,7 +229,7 @@ body{font-family:'Inter',sans-serif;margin:0;padding:0;display:flex;height:100vh
 </div>
 
 <script>
-const AUTH_ENDPOINT = '/be/api.php';
+const AUTH_ENDPOINT = '../../be/api.php';
 
 if (sessionStorage.getItem('mf_show_register') === '1') {
   sessionStorage.removeItem('mf_show_register');
@@ -307,7 +307,7 @@ document.getElementById('fl').addEventListener('submit', async function(e) {
     const d = await r.json();
     if (d.success) {
       alert_('la', 'success', d.message || 'Đăng nhập thành công!');
-      setTimeout(() => location.href = d.redirect || '/fe/pages/home.php', 800);
+      setTimeout(() => location.href = d.redirect || 'home.php', 800);
     } else {
       alert_('la', 'error', d.message);
       setLoad('bl', false);

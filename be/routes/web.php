@@ -16,16 +16,16 @@
 
 $router->get('dispatch', function () {
     if (empty($_SESSION['user_id'])) {
-        header('Location: /fe/pages/login.php');
+        header('Location: ../fe/pages/login.php');
         exit;
     }
 
     $role = $_SESSION['user_role'] ?? 'user';
 
     match (true) {
-        in_array($role, ['admin', 'admin_monitor'], true) => header('Location: /fe/admin/index.php'),
-        $role === 'staff'                                  => header('Location: /fe/pages/staff.php'),
-        default                                            => header('Location: /fe/pages/home.php'),
+        in_array($role, ['admin', 'admin_monitor'], true) => header('Location: ../fe/admin/index.php'),
+        $role === 'staff'                                  => header('Location: ../fe/pages/staff.php'),
+        default                                            => header('Location: ../fe/pages/home.php'),
     };
 
     exit;

@@ -1,6 +1,6 @@
 <?php
 session_start();
-if (empty($_SESSION['user_id'])) { header('Location: /fe/pages/login.php'); exit; }
+if (empty($_SESSION['user_id'])) { header('Location: login.php'); exit; }
 require_once __DIR__ . '/../../be/config/db.php';
 require_once __DIR__ . '/../../be/services/UserService.php';
 
@@ -112,7 +112,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
       <i class="fa-solid fa-ticket"></i>
       <h3>Chưa có vé nào</h3>
       <p><?= $tab==='upcoming' ? 'Bạn chưa có vé sắp chiếu. Hãy đặt vé ngay!' : ($tab==='past' ? 'Bạn chưa có vé đã chiếu.' : 'Bạn chưa có vé đã hủy.') ?></p>
-      <a href="/fe/pages/home.php" style="display:inline-flex;align-items:center;gap:7px;margin-top:16px;padding:10px 22px;background:var(--blue);color:#fff;border-radius:10px;font-weight:700;text-decoration:none"><i class="fa-solid fa-film"></i> Xem phim ngay</a>
+      <a href="home.php" style="display:inline-flex;align-items:center;gap:7px;margin-top:16px;padding:10px 22px;background:var(--blue);color:#fff;border-radius:10px;font-weight:700;text-decoration:none"><i class="fa-solid fa-film"></i> Xem phim ngay</a>
     </div>
     <?php else: ?>
     <div class="ticket-list">
@@ -262,7 +262,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 </div>
 
 <script>
-const USER_ENDPOINT = '/be/controllers/UserController.php';
+const USER_ENDPOINT = '../../be/api.php';
 
 function showAlert(type, message) {
   const box = document.getElementById('alert-box');
@@ -372,8 +372,8 @@ document.getElementById('review-form').addEventListener('submit', async function
 
 async function logout(){
   const fd=new FormData();fd.append('action','logout');
-  const r=await fetch('../../be/controllers/AuthController.php',{method:'POST',body:fd});
-  const d=await r.json();location.href=d.redirect||'/fe/pages/login.php';
+  const r=await fetch('../../be/api.php',{method:'POST',body:fd});
+  const d=await r.json();location.href=d.redirect||'login.php';
 }
 
 // Realtime: Ẩn nút hủy vé khi < 60 phút trước giờ chiếu

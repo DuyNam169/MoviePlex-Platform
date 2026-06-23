@@ -125,7 +125,7 @@ async function sidebarLogout() {
   const fd = new FormData();
   fd.append('action', 'logout');
   try {
-    const r = await fetch('../../be/controllers/AuthController.php', {method:'POST', body:fd});
+    const r = await fetch('../../be/api.php', {method:'POST', body:fd});
     const d = await r.json();
     window.location.href = d.redirect || 'login.php';
   } catch(e) {

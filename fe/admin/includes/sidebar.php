@@ -85,11 +85,11 @@ async function adminLogout() {
     const fd = new FormData();
     fd.append('action', 'logout');
     try {
-        const r = await fetch('/be/controllers/AuthController.php', {method: 'POST', body: fd});
+        const r = await fetch('../../be/api.php', {method: 'POST', body: fd});
         const d = await r.json();
-        window.location.href = d.redirect || '/fe/pages/login.php';
+        window.location.href = d.redirect || '../pages/login.php';
     } catch(e) {
-        window.location.href = '/fe/pages/login.php';
+        window.location.href = '../pages/login.php';
     }
 }
 </script>
