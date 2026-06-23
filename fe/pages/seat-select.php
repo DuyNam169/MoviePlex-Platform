@@ -1,10 +1,10 @@
 <?php
 session_start();
-if (empty($_SESSION['user_id'])) { header('Location: /fe/pages/login.php'); exit; }
+if (empty($_SESSION['user_id'])) { header('Location: login.php'); exit; }
 require_once __DIR__ . '/../../be/config/db.php';
 
 $showtime_id = (int)($_GET['showtime_id'] ?? 0);
-if (!$showtime_id) { header('Location: /fe/pages/home.php'); exit; }
+if (!$showtime_id) { header('Location: home.php'); exit; }
 
 $st = $pdo->prepare("
   SELECT s.*, m.title, m.duration_min, m.poster_url, m.age_rating,
@@ -16,11 +16,11 @@ $st = $pdo->prepare("
 ");
 $st->execute([$showtime_id]);
 $show = $st->fetch();
-if (!$show) { header('Location: /fe/pages/home.php'); exit; }
+if (!$show) { header('Location: home.php'); exit; }
 
 // Chặn truy cập nếu suất chiếu đã bị hủy hoặc bắt đầu quá 20 phút
 if ($show['is_cancelled'] == 1) {
-    header('Location: /fe/pages/home.php');
+    header('Location: home.php');
     exit;
 }
 
@@ -150,7 +150,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 <div class="toast-container" id="toast-container"></div>
 
 <div class="topbar">
-  <a href="/fe/pages/home.php" class="logo"><div class="logo-icon"><i class="fa-solid fa-clapperboard"></i></div><span class="logo-name">MovieFlex</span></a>
+  <a href="home.php" class="logo"><div class="logo-icon"><i class="fa-solid fa-clapperboard"></i></div><span class="logo-name">MovieFlex</span></a>
   <a href="movie-detail.php?id=<?= $show['movie_id'] ?>" class="back-btn"><i class="fa-solid fa-arrow-left"></i> Quay lại</a>
   <div class="step-bar">
     <div class="step done"><div class="step-num"><i class="fa-solid fa-check" style="font-size:9px"></i></div> Chọn phim</div>

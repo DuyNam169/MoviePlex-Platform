@@ -318,7 +318,7 @@ textarea.form-control{resize:vertical;min-height:100px}
 </div>
 
 <script>
-const USER_ENDPOINT = '/be/controllers/UserController.php';
+const USER_ENDPOINT = '../../be/api.php';
 
 // ── Support Ticket Form ──
 document.getElementById('support-form').addEventListener('submit', async function (e) {

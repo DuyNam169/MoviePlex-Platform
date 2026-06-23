@@ -59,7 +59,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 <body>
 
 <div class="auth-box">
-  <a href="/fe/pages/home.php" class="logo">
+  <a href="home.php" class="logo">
     <div class="logo-icon"><i class="fa-solid fa-clapperboard"></i></div>
     <div class="logo-name">MovieFlex</div>
   </a>
@@ -116,12 +116,12 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
 
   <div class="auth-footer">
-    <a href="/fe/pages/login.php"><i class="fa-solid fa-arrow-left"></i> Quay lại đăng nhập</a>
+    <a href="login.php"><i class="fa-solid fa-arrow-left"></i> Quay lại đăng nhập</a>
   </div>
 </div>
 
 <script>
-const ENDPOINT = '/be/api.php';
+const ENDPOINT = '../../be/api.php';
 
 function showMsg(type, text) {
   const el = document.getElementById('msg');
@@ -236,7 +236,7 @@ document.getElementById('btn-s3').addEventListener('click', async () => {
 
     if (d.success) {
       showMsg('succ', d.message);
-      setTimeout(() => location.href = '/fe/pages/login.php', 1500);
+      setTimeout(() => location.href = 'login.php', 1500);
     } else {
       showMsg('err', d.message);
     }

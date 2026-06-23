@@ -10,7 +10,7 @@ $pdo->exec("UPDATE movies SET status='now_showing' WHERE status='coming_soon' AN
 $movie = $pdo->prepare("SELECT * FROM movies WHERE id=? LIMIT 1");
 $movie->execute([$id]);
 $movie = $movie->fetch();
-if (!$movie) { header('Location: /fe/pages/home.php'); exit; }
+if (!$movie) { header('Location: home.php'); exit; }
 
 $showtimes = $pdo->prepare("
   SELECT s.*, c.name as cinema_name, c.address, c.city
@@ -159,13 +159,13 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 
 <div class="main">
   <div class="topbar">
-    <a href="/fe/pages/home.php" class="back-btn"><i class="fa-solid fa-arrow-left"></i> Quay lại</a>
+    <a href="home.php" class="back-btn"><i class="fa-solid fa-arrow-left"></i> Quay lại</a>
     <span class="tb-title"><?= htmlspecialchars($movie['title']) ?></span>
     <div class="tb-right">
       <?php if(!empty($_SESSION['user_id'])): ?>
       <div class="tb-av"><?= mb_strtoupper(mb_substr($_SESSION['user_name']??'U',0,1)) ?></div>
       <?php else: ?>
-      <a href="/fe/pages/login.php" class="btn btn-blue" style="height:34px;font-size:13px">Đăng nhập</a>
+      <a href="login.php" class="btn btn-blue" style="height:34px;font-size:13px">Đăng nhập</a>
       <?php endif; ?>
     </div>
   </div>
@@ -389,7 +389,7 @@ function goBook() {
     confirmText: 'Đến trang đăng nhập',
     confirmIcon: 'fa-arrow-right-to-bracket',
     cancelText: 'Ở lại'
-  }).then(ok => { if(ok) window.location.href='/fe/pages/login.php'; });
+  }).then(ok => { if(ok) window.location.href='login.php'; });
   <?php else: ?>
   window.location.href='seat-select.php?showtime_id='+selShowtime.id;
   <?php endif; ?>
@@ -397,9 +397,9 @@ function goBook() {
 
 async function logout(){
   const fd=new FormData();fd.append('action','logout');
-  const r=await fetch('../../be/controllers/AuthController.php',{method:'POST',body:fd});
+  const r=await fetch('../../be/api.php',{method:'POST',body:fd});
   const d=await r.json();
-  location.href=d.redirect||'/fe/pages/login.php';
+  location.href=d.redirect||'login.php';
 }
 </script>
 <script src="../assets/js/script.js"></script>

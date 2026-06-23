@@ -1,12 +1,12 @@
 <?php
 session_start();
-if (empty($_SESSION['user_id'])) { header('Location: /fe/pages/login.php'); exit; }
+if (empty($_SESSION['user_id'])) { header('Location: login.php'); exit; }
 require_once __DIR__ . '/../../be/config/db.php';
 
 $showtime_id = (int)($_GET['showtime_id'] ?? 0);
 $seatsParam  = $_GET['seats'] ?? '';
 $clientTotal = (int)($_GET['total'] ?? 0);
-if (!$showtime_id || !$seatsParam) { header('Location: /fe/pages/home.php'); exit; }
+if (!$showtime_id || !$seatsParam) { header('Location: home.php'); exit; }
 
 // Parse seats
 $seatGroups = explode('|', $seatsParam);
@@ -27,11 +27,11 @@ $show = $pdo->prepare("
 ");
 $show->execute([$showtime_id]);
 $show = $show->fetch();
-if (!$show) { header('Location: /fe/pages/home.php'); exit; }
+if (!$show) { header('Location: home.php'); exit; }
 
 // Chặn thanh toán nếu suất chiếu đã bị hủy hoặc bắt đầu quá 20 phút
 if ($show['is_cancelled'] == 1) {
-    header('Location: /fe/pages/home.php');
+    header('Location: home.php');
     exit;
 }
 
@@ -209,7 +209,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $pdo->commit();
-            header("Location: /fe/pages/booking-confirm.php?code=$first_booking_code"); exit;
+            header("Location: booking-confirm.php?code=$first_booking_code"); exit;
         } catch (Exception $e) {
             $pdo->rollBack();
             $error = 'Đặt vé thất bại. Vui lòng thử lại. Lỗi: ' . $e->getMessage();
@@ -298,7 +298,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 <body>
 
 <div class="topbar">
-  <a href="/fe/pages/home.php" class="logo"><div class="logo-icon"><i class="fa-solid fa-clapperboard"></i></div><span class="logo-name">MovieFlex</span></a>
+  <a href="home.php" class="logo"><div class="logo-icon"><i class="fa-solid fa-clapperboard"></i></div><span class="logo-name">MovieFlex</span></a>
   <div class="step-bar">
     <div class="step done"><div class="step-num"><i class="fa-solid fa-check" style="font-size:9px"></i></div> Chọn phim</div>
     <div class="step-line done"></div>

@@ -1,10 +1,10 @@
 <?php
 session_start();
-if (empty($_SESSION['user_id'])) { header('Location: /fe/pages/login.php'); exit; }
+if (empty($_SESSION['user_id'])) { header('Location: login.php'); exit; }
 require_once __DIR__ . '/../../be/config/db.php';
 
 $code = trim($_GET['code'] ?? '');
-if (!$code) { header('Location: /fe/pages/home.php'); exit; }
+if (!$code) { header('Location: home.php'); exit; }
 
 $user_role = $_SESSION['user_role'] ?? 'user';
 
@@ -22,7 +22,7 @@ $bk = $pdo->prepare("
 ");
 $bk->execute([$code]);
 $booking = $bk->fetch();
-if (!$booking) { header('Location: /fe/pages/home.php'); exit; }
+if (!$booking) { header('Location: home.php'); exit; }
 
 // Authorization check: standard users can only view their own bookings.
 if ($user_role !== 'staff' && $user_role !== 'admin') {
@@ -204,7 +204,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 </head>
 <body>
 <div class="topbar">
-  <a href="/fe/pages/home.php" class="logo"><div class="logo-icon"><i class="fa-solid fa-clapperboard"></i></div><span class="logo-name">MovieFlex</span></a>
+  <a href="home.php" class="logo"><div class="logo-icon"><i class="fa-solid fa-clapperboard"></i></div><span class="logo-name">MovieFlex</span></a>
   <div class="step-bar">
     <div class="step done"><div class="step-num"><i class="fa-solid fa-check" style="font-size:9px"></i></div> Chọn phim</div>
     <div class="step-line done"></div>
@@ -283,10 +283,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="actions">
       <button class="btn btn-print" onclick="document.getElementById('inv-overlay').classList.add('open')"><i class="fa-solid fa-file-invoice"></i> In hóa đơn</button>
       <?php if ($_SESSION['user_role'] === 'staff'): ?>
-        <a href="/fe/pages/staff.php" class="btn btn-blue"><i class="fa-solid fa-house"></i> Về ca trực nhân viên</a>
+        <a href="staff.php" class="btn btn-blue"><i class="fa-solid fa-house"></i> Về ca trực nhân viên</a>
       <?php else: ?>
-        <a href="/fe/pages/my-tickets.php" class="btn btn-outline"><i class="fa-solid fa-receipt"></i> Xem vé của tôi</a>
-        <a href="/fe/pages/home.php" class="btn btn-blue"><i class="fa-solid fa-house"></i> Về trang chủ</a>
+        <a href="my-tickets.php" class="btn btn-outline"><i class="fa-solid fa-receipt"></i> Xem vé của tôi</a>
+        <a href="home.php" class="btn btn-blue"><i class="fa-solid fa-house"></i> Về trang chủ</a>
       <?php endif; ?>
     </div>
 

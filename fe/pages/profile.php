@@ -1,6 +1,6 @@
 <?php
 session_start();
-if (empty($_SESSION['user_id'])) { header('Location: /fe/pages/login.php'); exit; }
+if (empty($_SESSION['user_id'])) { header('Location: login.php'); exit; }
 
 define('BASE_PATH', dirname(__DIR__, 2));
 require_once BASE_PATH . '/be/config/db.php';
@@ -16,7 +16,7 @@ $service = new UserService($pdo);
 
 $profileResult = $service->getProfile($uid);
 if (!$profileResult['success']) {
-    header('Location: /fe/pages/login.php'); exit;
+    header('Location: login.php'); exit;
 }
 $user  = $profileResult['user'];
 $stats = $profileResult['stats'];
@@ -257,7 +257,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 </div>
 
 <script>
-const USER_ENDPOINT = '/be/api.php';
+const USER_ENDPOINT = '../../be/api.php';
 
 function showTab(tab, el) {
   document.querySelectorAll('.form-section').forEach(s => {
@@ -347,9 +347,9 @@ document.getElementById('form-password').addEventListener('submit', async functi
 async function logout() {
   const fd = new FormData();
   fd.append('action', 'logout');
-  const r = await fetch('/be/api.php', { method: 'POST', body: fd });
+  const r = await fetch('../../be/api.php', { method: 'POST', body: fd });
   const d = await r.json();
-  location.href = d.redirect || '/fe/pages/login.php';
+  location.href = d.redirect || 'login.php';
 }
 </script>
 </body>

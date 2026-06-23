@@ -1,6 +1,6 @@
 <?php
 session_start();
-if (empty($_SESSION['user_id'])) { header('Location: /fe/pages/login.php'); exit; }
+if (empty($_SESSION['user_id'])) { header('Location: login.php'); exit; }
 require_once __DIR__ . '/../../be/config/db.php';
 $active_page = 'home';
 
@@ -506,8 +506,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
                   </div>
                   <p class="hero-desc"><?= htmlspecialchars($m['description'] ?? '') ?></p>
                   <div class="hero-btns">
-                    <a href="/fe/pages/movie-detail.php?id=<?= $m['id'] ?>" class="btn-hero btn-hero-primary"><i class="fa-solid fa-ticket"></i> Đặt vé ngay</a>
-                    <a href="/fe/pages/movie-detail.php?id=<?= $m['id'] ?>" class="btn-hero btn-hero-outline"><i class="fa-solid fa-play"></i> Xem trailer</a>
+                    <a href="movie-detail.php?id=<?= $m['id'] ?>" class="btn-hero btn-hero-primary"><i class="fa-solid fa-ticket"></i> Đặt vé ngay</a>
+                    <a href="movie-detail.php?id=<?= $m['id'] ?>" class="btn-hero btn-hero-outline"><i class="fa-solid fa-play"></i> Xem trailer</a>
                   </div>
                 </div>
               </div>
@@ -548,7 +548,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
     <!-- PHIM ĐANG CHIẾU -->
     <div class="sec-head">
       <h2 class="sec-title">🎬 Phim Đang Chiếu</h2>
-      <a href="/fe/pages/movies.php" class="sec-link">Xem tất cả <i class="fa-solid fa-arrow-right"></i></a>
+      <a href="movies.php" class="sec-link">Xem tất cả <i class="fa-solid fa-arrow-right"></i></a>
     </div>
 
     <!-- FILTERS -->
@@ -563,7 +563,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 
     <div class="movie-grid" id="movie-grid">
       <?php foreach($movies_showing as $m): ?>
-      <a class="movie-card" href="/fe/pages/movie-detail.php?id=<?= $m['id'] ?>" data-formats="<?= htmlspecialchars($m['formats'] ?? '') ?>">
+      <a class="movie-card" href="movie-detail.php?id=<?= $m['id'] ?>" data-formats="<?= htmlspecialchars($m['formats'] ?? '') ?>">
         <div class="mc-wrap">
           <?php if($m['poster_url']): ?>
             <img class="mc-poster" src="<?= htmlspecialchars($m['poster_url']) ?>" alt="<?= htmlspecialchars($m['title']) ?>">
@@ -605,18 +605,18 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
         <h3>🎁 Ưu Đãi Thành Viên</h3>
         <p>Giảm 20% cho tất cả các suất chiếu IMAX vào mỗi thứ Tư hàng tuần.<br>Đăng ký ngay để không bỏ lỡ!</p>
       </div>
-      <a href="/fe/pages/register.php" class="btn-promo"><i class="fa-solid fa-star"></i>&nbsp; Đăng ký ngay</a>
+      <a href="register.php" class="btn-promo"><i class="fa-solid fa-star"></i>&nbsp; Đăng ký ngay</a>
     </div>
 
     <!-- SẮP CHIẾU -->
     <?php if(!empty($movies_coming)): ?>
     <div class="sec-head">
       <h2 class="sec-title">🔜 Sắp Chiếu</h2>
-      <a href="/fe/pages/movies.php?tab=coming" class="sec-link">Xem tất cả <i class="fa-solid fa-arrow-right"></i></a>
+      <a href="movies.php?tab=coming" class="sec-link">Xem tất cả <i class="fa-solid fa-arrow-right"></i></a>
     </div>
     <div class="upcoming-grid">
       <?php foreach($movies_coming as $m): ?>
-      <div class="uc" onclick="location.href='/fe/pages/movie-detail.php?id=<?= $m['id'] ?>'">
+      <div class="uc" onclick="location.href='movie-detail.php?id=<?= $m['id'] ?>'">
         <?php if($m['poster_url']): ?>
           <img class="uc-poster" src="<?= htmlspecialchars($m['poster_url']) ?>" alt="">
         <?php else: ?>
@@ -710,9 +710,9 @@ function markAllRead() {
 // Logout
 async function logout(){
   const fd = new FormData(); fd.append('action','logout');
-  const r = await fetch('../../be/controllers/AuthController.php',{method:'POST',body:fd});
+  const r = await fetch('../../be/api.php',{method:'POST',body:fd});
   const d = await r.json();
-  location.href = d.redirect || '/fe/pages/login.php';
+  location.href = d.redirect || 'login.php';
 }
 
 // ── Hero Carousel Slider Logic ──
