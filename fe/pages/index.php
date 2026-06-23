@@ -1,19 +1,10 @@
 <?php
-session_start();
-if (empty($_SESSION['user_id'])) {
-    header('Location: /fe/pages/login.php');
-    exit;
-}
+/**
+ * fe/pages/index.php
+ *
+ * Entry point. Delegates role-based redirect logic to the web router.
+ * No business logic lives here.
+ */
 
-$role = $_SESSION['user_role'] ?? 'user';
-
-if ($role === 'admin' || $role === 'admin_monitor') {
-    header('Location: /fe/admin/index.php');
-    exit;
-} elseif ($role === 'staff') {
-    header('Location: /fe/pages/staff.php');
-    exit;
-} else {
-    header('Location: /fe/pages/home.php');
-    exit;
-}
+header('Location: /be/web.php?action=dispatch');
+exit;

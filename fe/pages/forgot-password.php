@@ -3,9 +3,9 @@
  * fe/pages/forgot-password.php
  *
  * Pure presentation layer. No DB access, no business logic.
- * All actions are sent via JS fetch() to ForgotPasswordController.php.
+ * All actions are sent via JS fetch() to /be/api.php.
  *
- * Step state is stored in $_SESSION by ForgotPasswordController on the BE side.
+ * Step state is stored in $_SESSION by AuthController on the BE side.
  * This page reads $_SESSION['pwd_step'] only to decide which step UI to render.
  */
 
@@ -121,7 +121,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 </div>
 
 <script>
-const ENDPOINT = '/be/controllers/ForgotPasswordController.php';
+const ENDPOINT = '/be/api.php';
 
 function showMsg(type, text) {
   const el = document.getElementById('msg');
@@ -163,7 +163,6 @@ document.getElementById('btn-s1').addEventListener('click', async () => {
     const d = await r.json();
 
     if (d.success) {
-      // DEV MODE: show OTP on screen. Remove this block in production.
       if (d.dev_otp) {
         showMsg('succ', `(DEV MODE) Mã OTP của bạn là: <strong>${d.dev_otp}</strong>`);
       } else {

@@ -1,8 +1,13 @@
 <?php
 session_start();
 if (empty($_SESSION['user_id'])) { header('Location: /fe/pages/login.php'); exit; }
-require_once __DIR__ . '/../../be/config/db.php';
-require_once __DIR__ . '/../../be/services/UserService.php';
+
+define('BASE_PATH', dirname(__DIR__, 2));
+require_once BASE_PATH . '/be/config/db.php';
+require_once BASE_PATH . '/be/core/Response.php';
+require_once BASE_PATH . '/be/core/Request.php';
+require_once BASE_PATH . '/be/middleware/AuthMiddleware.php';
+require_once BASE_PATH . '/be/services/UserService.php';
 
 $uid = $_SESSION['user_id'];
 $active_page = 'profile';
@@ -77,7 +82,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 .btn-save:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(59,130,246,.4)}
 .btn-save:disabled{opacity:.6;cursor:not-allowed;transform:none}
 .points-box{background:linear-gradient(135deg,#F59E0B,#D97706,#B45309);border-radius:16px;padding:28px;color:#fff;margin-bottom:24px;position:relative;overflow:hidden}
-.points-box::before{content:'★';position:absolute;right:-10px;top:-20px;font-size:120px;opacity:.08}
+.points-box::before{content:'';position:absolute;right:-10px;top:-20px;font-size:120px;opacity:.08}
 .points-num{font-size:44px;font-weight:800;line-height:1;letter-spacing:-2px}
 .points-label{font-size:14px;opacity:.9;margin-top:6px;font-weight:600}
 .points-note{font-size:12.5px;opacity:.75;margin-top:10px;background:rgba(255,255,255,.15);padding:6px 12px;border-radius:8px;display:inline-block}
@@ -91,9 +96,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 .tip-item{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;font-size:13px;color:#4338CA}
 .tip-item:last-child{margin-bottom:0}
 .tip-item i{margin-top:2px;font-size:12px;flex-shrink:0}
-
 /* VOUCHERS GRID */
-.vouchers-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 8px; }
+.vouchers-grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:8px}
 .voucher-card{display:flex;background:var(--card);border-radius:14px;border:1.5px solid var(--border);overflow:hidden;box-shadow:0 2px 12px rgba(15,23,42,.04);transition:transform .2s,box-shadow .2s}
 .voucher-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(15,23,42,.1)}
 .voucher-left{background:linear-gradient(135deg,var(--blue),var(--indigo));color:#fff;width:115px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;text-align:center;position:relative;flex-shrink:0}
@@ -137,10 +141,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
         </div>
       </div>
       <div class="profile-menu">
-        <div class="pm-item active" onclick="showTab('profile')"><div class="pm-icon"><i class="fa-regular fa-user"></i></div><span class="pm-label">Thông tin cá nhân</span></div>
-        <div class="pm-item" onclick="showTab('password')"><div class="pm-icon"><i class="fa-solid fa-lock"></i></div><span class="pm-label">Đổi mật khẩu</span></div>
-        <div class="pm-item" onclick="showTab('points')"><div class="pm-icon"><i class="fa-solid fa-star"></i></div><span class="pm-label">Điểm thưởng</span></div>
-        <div class="pm-item" onclick="showTab('vouchers')"><div class="pm-icon"><i class="fa-solid fa-tag"></i></div><span class="pm-label">Voucher của tôi</span></div>
+        <div class="pm-item active" onclick="showTab('profile', this)"><div class="pm-icon"><i class="fa-regular fa-user"></i></div><span class="pm-label">Thông tin cá nhân</span></div>
+        <div class="pm-item" onclick="showTab('password', this)"><div class="pm-icon"><i class="fa-solid fa-lock"></i></div><span class="pm-label">Đổi mật khẩu</span></div>
+        <div class="pm-item" onclick="showTab('points', this)"><div class="pm-icon"><i class="fa-solid fa-star"></i></div><span class="pm-label">Điểm thưởng</span></div>
+        <div class="pm-item" onclick="showTab('vouchers', this)"><div class="pm-icon"><i class="fa-solid fa-tag"></i></div><span class="pm-label">Voucher của tôi</span></div>
         <a href="my-tickets.php" class="pm-item"><div class="pm-icon"><i class="fa-solid fa-receipt"></i></div><span class="pm-label">Lịch sử đặt vé</span></a>
       </div>
     </div>
@@ -253,20 +257,17 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 </div>
 
 <script>
-const USER_ENDPOINT = '/be/controllers/UserController.php';
+const USER_ENDPOINT = '/be/api.php';
 
-function showTab(tab) {
-  // Hide all panels using inline style
+function showTab(tab, el) {
   document.querySelectorAll('.form-section').forEach(s => {
     s.style.display = 'none';
     s.classList.remove('active');
   });
-  // Show selected panel
   const target = document.getElementById('tab-' + tab);
   if (target) { target.style.display = 'block'; target.classList.add('active'); }
-  // Update menu active state
   document.querySelectorAll('.pm-item').forEach(i => i.classList.remove('active'));
-  event.currentTarget.classList.add('active');
+  if (el) el.classList.add('active');
 }
 
 function copyVoucherCode(btn, code) {
@@ -343,10 +344,12 @@ document.getElementById('form-password').addEventListener('submit', async functi
   }
 });
 
-async function logout(){
-  const fd=new FormData();fd.append('action','logout');
-  const r=await fetch('../../be/controllers/AuthController.php',{method:'POST',body:fd});
-  const d=await r.json();location.href=d.redirect||'/fe/pages/login.php';
+async function logout() {
+  const fd = new FormData();
+  fd.append('action', 'logout');
+  const r = await fetch('/be/api.php', { method: 'POST', body: fd });
+  const d = await r.json();
+  location.href = d.redirect || '/fe/pages/login.php';
 }
 </script>
 </body>
