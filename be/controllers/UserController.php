@@ -1,37 +1,33 @@
 <?php
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once BASE_PATH . '/be/core/Response.php';
+require_once BASE_PATH . '/be/core/Request.php';
+require_once BASE_PATH . '/be/services/UserService.php';
+require_once BASE_PATH . '/be/middleware/AuthMiddleware.php';
 
-require_once __DIR__ . '/../config/db.php';
-require_once __DIR__ . '/../core/Response.php';
-require_once __DIR__ . '/../core/Request.php';
-require_once __DIR__ . '/../middleware/AuthMiddleware.php';
-require_once __DIR__ . '/../services/UserService.php';
+class UserController
+{
+    private UserService $service;
+    private Request $request;
 
-header('Content-Type: application/json; charset=utf-8');
+    public function __construct(PDO $pdo)
+    {
+        $this->service = new UserService($pdo);
+        $this->request = new Request();
+    }
 
-// Mọi action trong controller này đều yêu cầu đăng nhập
-AuthMiddleware::api();
-
-$request = new Request();
-$service = new UserService($pdo);
-$userId  = AuthMiddleware::userId();
-$action  = $request->post('action') ?? $request->get('action') ?? '';
-
-switch ($action) {
-
-    // ── PROFILE ────────────────────────────────────────────────────────────
-    case 'profile':
-        $result = $service->getProfile($userId);
+    public function profile(): void
+    {
+        $result = $this->service->getProfile(AuthMiddleware::userId());
         Response::json($result);
-        break;
+    }
 
-    case 'update_profile':
-        $result = $service->updateProfile($userId, [
+    public function updateProfile(): void
+    {
+        $userId = AuthMiddleware::userId();
+        $result = $this->service->updateProfile($userId, [
             'full_name' => $_POST['full_name'] ?? '',
-            'phone'     => $_POST['phone'] ?? '',
+            'phone'     => $_POST['phone']     ?? '',
         ]);
 
         if ($result['success']) {
@@ -39,48 +35,51 @@ switch ($action) {
         }
 
         Response::json($result);
-        break;
+    }
 
-    // ── CHANGE PASSWORD ───────────────────────────────────────────────────
-    case 'change_password':
-        $oldPwd  = $_POST['old_password'] ?? '';
-        $newPwd  = $_POST['new_password'] ?? '';
-        $confPwd = $_POST['confirm_password'] ?? '';
-
-        $result = $service->changePassword($userId, $oldPwd, $newPwd, $confPwd);
+    public function changePassword(): void
+    {
+        $result = $this->service->changePassword(
+            AuthMiddleware::userId(),
+            $_POST['old_password']     ?? '',
+            $_POST['new_password']     ?? '',
+            $_POST['confirm_password'] ?? ''
+        );
         Response::json($result);
-        break;
+    }
 
-    // ── MY TICKETS ─────────────────────────────────────────────────────────
-    case 'my_tickets':
-        $result = $service->getMyTickets($userId);
+    public function myTickets(): void
+    {
+        $result = $this->service->getMyTickets(AuthMiddleware::userId());
         Response::json($result);
-        break;
+    }
 
-    case 'cancel_booking':
+    public function cancelBooking(): void
+    {
         $bookingCode = trim($_POST['booking_code'] ?? '');
-        $result      = $service->cancelBooking($userId, $bookingCode);
+        $result      = $this->service->cancelBooking(AuthMiddleware::userId(), $bookingCode);
         Response::json($result);
-        break;
+    }
 
-    // ── MOVIE REVIEW ───────────────────────────────────────────────────────
-    case 'submit_review':
-        $bookingCode = trim($_POST['booking_code'] ?? '');
-        $rating      = (int) ($_POST['rating'] ?? 10);
-        $comment     = trim($_POST['comment'] ?? '');
-
-        $result = $service->submitReview($userId, $bookingCode, $rating, $comment);
+    public function submitReview(): void
+    {
+        $result = $this->service->submitReview(
+            AuthMiddleware::userId(),
+            trim($_POST['booking_code'] ?? ''),
+            (int) ($_POST['rating']  ?? 10),
+            trim($_POST['comment']   ?? '')
+        );
         Response::json($result);
-        break;
+    }
 
-    // ── MY VOUCHERS ────────────────────────────────────────────────────────
-    case 'my_vouchers':
-        $result = $service->getMyVouchers($userId);
+    public function myVouchers(): void
+    {
+        $result = $this->service->getMyVouchers(AuthMiddleware::userId());
         Response::json($result);
-        break;
+    }
 
-    // ── SUBMIT SUPPORT TICKET ──────────────────────────────────────────────
-    case 'submit_support_ticket':
+    public function submitSupportTicket(): void
+    {
         $fullName = trim($_POST['fullname'] ?? '');
         $email    = trim($_POST['email']    ?? '');
         $phone    = trim($_POST['phone']    ?? '');
@@ -89,15 +88,11 @@ switch ($action) {
 
         if (!$fullName || !$email || !$subject || !$content) {
             Response::error('Vui lòng điền đầy đủ các thông tin bắt buộc.');
-            break;
+            return;
         }
 
         try {
-            $pdo->prepare("
-                INSERT INTO support_tickets (fullname, email, phone, subject, content)
-                VALUES (?, ?, ?, ?, ?)
-            ")->execute([$fullName, $email, $phone ?: null, $subject, $content]);
-
+            $this->service->submitSupportTicket($fullName, $email, $phone, $subject, $content);
             Response::json([
                 'success' => true,
                 'message' => 'Yêu cầu hỗ trợ của bạn đã được gửi đi! Chúng tôi sẽ phản hồi qua email trong vòng 24h.',
@@ -105,10 +100,5 @@ switch ($action) {
         } catch (Exception $e) {
             Response::error('Đã có lỗi xảy ra. Vui lòng thử lại sau.');
         }
-        break;
-
-    // ── INVALID ACTION ─────────────────────────────────────────────────────
-    default:
-        Response::error('Hành động không hợp lệ.', 400);
-        break;
+    }
 }

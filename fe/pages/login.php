@@ -115,11 +115,11 @@ body{font-family:'Inter',sans-serif;margin:0;padding:0;display:flex;height:100vh
       <p class="hero-desc">Hàng trăm bộ phim, hàng nghìn suất chiếu — đặt vé chỉ trong 60 giây. Ưu đãi thành viên độc quyền mỗi ngày.</p>
     </div>
     <div class="movie-strip">
-      <div class="strip-card"><img src="https://wsrv.nl/?url=image.tmdb.org/t/p/w200/8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg" alt=""><div class="rating">⭐ 9.2</div></div>
-      <div class="strip-card"><img src="https://upload.wikimedia.org/wikipedia/en/4/4a/Oppenheimer_%28film%29.jpg" alt=""><div class="rating">⭐ 9.0</div></div>
-      <div class="strip-card"><img src="https://upload.wikimedia.org/wikipedia/en/2/2e/Inception_%282010%29_theatrical_poster.jpg" alt=""><div class="rating">⭐ 9.3</div></div>
-      <div class="strip-card"><img src="https://upload.wikimedia.org/wikipedia/en/b/bc/Interstellar_film_poster.jpg" alt=""><div class="rating">⭐ 9.4</div></div>
-      <div class="strip-card"><img src="https://wsrv.nl/?url=image.tmdb.org/t/p/w200/8Vt6mWEReuy4Of61Lnj5Xj704m8.jpg" alt=""><div class="rating">⭐ 9.1</div></div>
+      <div class="strip-card"><img src="https://wsrv.nl/?url=image.tmdb.org/t/p/w200/8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg" alt=""><div class="rating">9.2</div></div>
+      <div class="strip-card"><img src="https://upload.wikimedia.org/wikipedia/en/4/4a/Oppenheimer_%28film%29.jpg" alt=""><div class="rating">9.0</div></div>
+      <div class="strip-card"><img src="https://upload.wikimedia.org/wikipedia/en/2/2e/Inception_%282010%29_theatrical_poster.jpg" alt=""><div class="rating">9.3</div></div>
+      <div class="strip-card"><img src="https://upload.wikimedia.org/wikipedia/en/b/bc/Interstellar_film_poster.jpg" alt=""><div class="rating">9.4</div></div>
+      <div class="strip-card"><img src="https://wsrv.nl/?url=image.tmdb.org/t/p/w200/8Vt6mWEReuy4Of61Lnj5Xj704m8.jpg" alt=""><div class="rating">9.1</div></div>
     </div>
     <div class="stats-bar">
       <div class="stat"><div class="stat-val">500<span>+</span></div><div class="stat-lbl">Bộ phim</div></div>
@@ -172,7 +172,7 @@ body{font-family:'Inter',sans-serif;margin:0;padding:0;display:flex;height:100vh
   <!-- REGISTER VIEW -->
   <div id="vr">
     <div class="form-header">
-      <h2>Tạo tài khoản mới 🎬</h2>
+      <h2>Tạo tài khoản mới</h2>
       <p>Tham gia MovieFlex để nhận ưu đãi thành viên và đặt vé dễ dàng hơn.</p>
     </div>
     <div id="ra" class="alert"></div>
@@ -229,17 +229,14 @@ body{font-family:'Inter',sans-serif;margin:0;padding:0;display:flex;height:100vh
 </div>
 
 <script>
-// Auth controller endpoint — single source of truth
-const AUTH_ENDPOINT = '/be/controllers/AuthController.php';
+const AUTH_ENDPOINT = '/be/api.php';
 
-// Auto-switch to register if flagged from guest page
 if (sessionStorage.getItem('mf_show_register') === '1') {
   sessionStorage.removeItem('mf_show_register');
   document.getElementById('vl').style.display = 'none';
   document.getElementById('vr').style.display = 'block';
 }
 
-// Background slideshow
 let slideIdx = 0;
 const slides = document.querySelectorAll('.bg-slide');
 setInterval(() => {
@@ -248,7 +245,6 @@ setInterval(() => {
   slides[slideIdx].classList.add('active');
 }, 4000);
 
-// Floating particles
 const pc = document.getElementById('particles');
 for (let i = 0; i < 30; i++) {
   const d = document.createElement('div');
@@ -290,7 +286,6 @@ function setLoad(id, on) {
   b.disabled = on;
 }
 
-// LOGIN
 document.getElementById('fl').addEventListener('submit', async function(e) {
   e.preventDefault();
   document.querySelectorAll('.fe').forEach(x => x.className = 'fe');
@@ -323,7 +318,6 @@ document.getElementById('fl').addEventListener('submit', async function(e) {
   }
 });
 
-// REGISTER
 document.getElementById('fr').addEventListener('submit', async function(e) {
   e.preventDefault();
   document.querySelectorAll('.fe').forEach(x => x.className = 'fe');
@@ -346,7 +340,6 @@ document.getElementById('fr').addEventListener('submit', async function(e) {
   fd.append('action', 'register');
 
   try {
-    // Both login and register go to the same AuthController
     const r = await fetch(AUTH_ENDPOINT, { method: 'POST', body: fd });
     const d = await r.json();
     if (d.success) {
