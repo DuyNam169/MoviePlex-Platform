@@ -79,6 +79,34 @@ switch ($action) {
         Response::json($result);
         break;
 
+    // ── SUBMIT SUPPORT TICKET ──────────────────────────────────────────────
+    case 'submit_support_ticket':
+        $fullName = trim($_POST['fullname'] ?? '');
+        $email    = trim($_POST['email']    ?? '');
+        $phone    = trim($_POST['phone']    ?? '');
+        $subject  = trim($_POST['subject']  ?? '');
+        $content  = trim($_POST['content']  ?? '');
+
+        if (!$fullName || !$email || !$subject || !$content) {
+            Response::error('Vui lòng điền đầy đủ các thông tin bắt buộc.');
+            break;
+        }
+
+        try {
+            $pdo->prepare("
+                INSERT INTO support_tickets (fullname, email, phone, subject, content)
+                VALUES (?, ?, ?, ?, ?)
+            ")->execute([$fullName, $email, $phone ?: null, $subject, $content]);
+
+            Response::json([
+                'success' => true,
+                'message' => 'Yêu cầu hỗ trợ của bạn đã được gửi đi! Chúng tôi sẽ phản hồi qua email trong vòng 24h.',
+            ]);
+        } catch (Exception $e) {
+            Response::error('Đã có lỗi xảy ra. Vui lòng thử lại sau.');
+        }
+        break;
+
     // ── INVALID ACTION ─────────────────────────────────────────────────────
     default:
         Response::error('Hành động không hợp lệ.', 400);
