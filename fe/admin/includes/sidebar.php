@@ -5,7 +5,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <aside class="sidebar">
     <div class="sidebar-header">
         <div class="logo" style="display: flex; align-items: center; width: 100%; cursor: pointer;" title="Thu gọn / Mở rộng Sidebar" data-tooltip="Thu gọn / Mở rộng">
-            <i class="fa-solid fa-film"></i>
+            <i class="fa-solid fa-clapperboard"></i>
             <div class="logo-text">
                 <h2>MovieFlex Admin</h2>
                 <p>HỆ THỐNG QUẢN TRỊ</p>

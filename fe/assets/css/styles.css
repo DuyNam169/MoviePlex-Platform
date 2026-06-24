@@ -1,7 +1,7 @@
 :root {
-    --primary-blue: #4F46E5; /* Royal Indigo */
-    --primary-blue-hover: #4338CA;
-    --primary-gradient: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+    --primary-blue: #DF1730; /* Cinema Red */
+    --primary-blue-hover: #C21025;
+    --primary-gradient: #DF1730; /* Flat solid brand red */
     --bg-color: #F8FAFC; /* Slate 50 */
     --card-bg: #FFFFFF;
     --sidebar-bg: #0F172A; /* Slate 900 - Luxury Dark Sidebar */
@@ -99,7 +99,7 @@ a {
     background: var(--primary-gradient); 
     padding: 10px; 
     border-radius: var(--radius-md); 
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+    box-shadow: 0 4px 12px rgba(223, 23, 48, 0.3);
 }
 
 .logo h2 { 
@@ -170,7 +170,7 @@ a {
 .sidebar-nav li.active a { 
     background: var(--primary-gradient); 
     color: #FFFFFF; 
-    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.25);
+    box-shadow: 0 4px 14px rgba(223, 23, 48, 0.25);
 }
 
 .sidebar-nav li.active a i {
@@ -468,7 +468,7 @@ body.sidebar-collapsed .main-content {
     color: #FFFFFF;
     font-size: 14px;
     flex-shrink: 0;
-    box-shadow: 0 3px 10px rgba(79, 70, 229, 0.3);
+    box-shadow: 0 3px 10px rgba(223, 23, 48, 0.3);
 }
 
 .header-page-info {
@@ -582,7 +582,7 @@ body.sidebar-collapsed .main-content {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.35);
+    box-shadow: 0 2px 8px rgba(223, 23, 48, 0.35);
     letter-spacing: 0.5px;
 }
 
@@ -702,7 +702,7 @@ body.sidebar-collapsed .main-content {
 }
 
 .btn-primary:hover { 
-    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35); 
+    box-shadow: 0 4px 14px rgba(223, 23, 48, 0.35); 
     transform: translateY(-1px); 
 }
 

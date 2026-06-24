@@ -67,7 +67,7 @@ function _sb_cls(string $page, string $ap): string {
   </div>
   <?php else: ?>
   <div class="sb-bottom">
-    <a href="login.php" style="display:flex;align-items:center;justify-content:center;gap:8px;margin:0 10px 14px;height:42px;background:var(--blue);color:#fff;border-radius:12px;font-size:14px;font-weight:700;text-decoration:none;transition:background .2s">
+    <a href="login.php" style="display:flex;align-items:center;justify-content:center;gap:8px;margin:0 10px 14px;height:42px;background:var(--blue,#DF1730);color:#fff;border-radius:12px;font-size:14px;font-weight:700;text-decoration:none;transition:background .2s">
       <i class="fa-solid fa-right-to-bracket"></i> Đăng nhập
     </a>
   </div>
@@ -77,19 +77,19 @@ function _sb_cls(string $page, string $ap): string {
 <style>
 .sidebar{width:var(--sbw,240px);background:#fff;min-height:100vh;position:fixed;left:0;top:0;display:flex;flex-direction:column;z-index:100;border-right:1px solid var(--border,#E2E8F0)}
 .sb-logo{display:flex;align-items:center;gap:12px;padding:26px 20px 20px;border-bottom:1px solid var(--border,#E2E8F0)}
-.sb-logo-icon{width:36px;height:36px;background:var(--blue,#2563EB);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;flex-shrink:0}
+.sb-logo-icon{width:36px;height:36px;background:var(--blue,#DF1730);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;flex-shrink:0}
 .sb-logo-name{font-size:19px;font-weight:800;color:#0F172A;letter-spacing:-.3px}
 .sb-nav{padding:20px 16px;flex:1;overflow-y:auto}
 .sb-section{font-size:11px;font-weight:700;letter-spacing:.8px;color:#94A3B8;text-transform:uppercase;padding:0 12px;margin:18px 0 8px}
 .sb-section:first-child{margin-top:0}
 .sb-item{display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:12px;color:#64748B;font-size:14.5px;font-weight:600;cursor:pointer;transition:all .2s;text-decoration:none;margin-bottom:4px}
 .sb-item:hover{background:#F8FAFC;color:#0F172A}
-.sb-item.active{background:var(--blue,#2563EB);color:#fff;box-shadow:0 4px 12px rgba(37,99,235,.25)}
+.sb-item.active{background:var(--blue,#DF1730);color:#fff;box-shadow:0 4px 12px rgba(223,23,48,.25)}
 .sb-item i{width:16px;font-size:15px;text-align:center;flex-shrink:0;opacity:.8}
 .sb-item.active i{opacity:1}
 .sb-bottom{padding:16px;border-top:1px solid var(--border,#E2E8F0)}
 .sb-user{display:flex;align-items:center;gap:12px;padding:0}
-.sb-avatar{width:38px;height:38px;border-radius:50%;background:var(--blue,#2563EB);display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;font-weight:700;flex-shrink:0}
+.sb-avatar{width:38px;height:38px;border-radius:50%;background:var(--blue,#DF1730);display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;font-weight:700;flex-shrink:0}
 .sb-uinfo{flex:1;min-width:0}
 .sb-uname{font-size:13.5px;font-weight:700;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sb-uemail{font-size:12px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -98,23 +98,23 @@ function _sb_cls(string $page, string $ap): string {
 
 /* Member Promo Box */
 .sb-promo-box {
-  background: linear-gradient(135deg, #EFF6FF, #DBEAFE);
+  background: #FAF0F1;
   border-radius: 12px;
   padding: 16px;
   margin: 10px 14px 10px;
-  border: 1px solid #BFDBFE;
+  border: 1px solid #FCA5A5;
 }
 .sb-promo-box h4 {
   font-size: 12.5px;
   font-weight: 800;
-  color: var(--blue,#2563EB);
+  color: var(--blue,#DF1730);
   margin-bottom: 6px;
   letter-spacing: -0.2px;
   line-height: 1.3;
 }
 .sb-promo-box p {
   font-size: 11px;
-  color: #1E3A8A;
+  color: #991B1B;
   line-height: 1.4;
   font-weight: 500;
 }

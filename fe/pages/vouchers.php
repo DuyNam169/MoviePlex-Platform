@@ -203,7 +203,8 @@ $vouchers = $vouchers->fetchAll();
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --blue:#2563EB;
+  --blue:#DF1730;
+  --indigo:#C21025;
   --bg:#F1F5F9;
   --card:#fff;
   --text:#0F172A;
@@ -225,7 +226,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 .content{padding:24px 28px;flex:1;display:grid;grid-template-columns:1fr 340px;gap:24px;max-width:1400px;margin:0 auto;width:100%}
 
 /* BANNER HERO */
-.banner-hero{background:linear-gradient(135deg, #2563EB, #7C3AED);color:#fff;border-radius:var(--r);padding:32px;margin-bottom:24px;box-shadow:var(--sh);grid-column:1 / -1;display:flex;justify-content:space-between;align-items:center;gap:24px;position:relative;overflow:hidden}
+.banner-hero{background:#1E1E24;color:#fff;border-radius:var(--r);padding:32px;margin-bottom:24px;box-shadow:var(--sh);grid-column:1 / -1;display:flex;justify-content:space-between;align-items:center;gap:24px;position:relative;overflow:hidden;border:1px solid var(--border)}
 .banner-hero::before{content:'';position:absolute;width:150px;height:150px;background:rgba(255,255,255,.05);border-radius:50%;top:-30px;right:-30px}
 .banner-content h2{font-size:24px;font-weight:800;margin-bottom:8px;letter-spacing:-0.5px}
 .banner-content p{font-size:14px;opacity:0.9;max-width:500px;line-height:1.5}
@@ -234,17 +235,17 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 /* VOUCHERS GRID */
 .vouchers-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
 .voucher-card { display: flex; background: var(--card); border-radius: 12px; border: 1.5px solid var(--border); overflow: hidden; position: relative; box-shadow: 0 2px 10px rgba(15,23,42,.03); }
-.voucher-left { background: linear-gradient(135deg, var(--blue), #3B82F6); color: #fff; width: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 14px; text-align: center; position: relative; flex-shrink: 0; }
+.voucher-left { background: var(--blue); color: #fff; width: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 14px; text-align: center; position: relative; flex-shrink: 0; }
 .voucher-left::after { content: ''; position: absolute; right: -5px; top: 0; bottom: 0; width: 10px; background-image: radial-gradient(circle at 10px 5px, var(--bg) 4px, transparent 4px); background-size: 10px 10px; background-position: right top; }
 .v-val { font-size: 22px; font-weight: 800; }
 .v-type { font-size: 10.5px; opacity: .9; margin-top: 2px; font-weight: 700; text-transform: uppercase; }
 .voucher-right { flex: 1; padding: 16px 20px; display: flex; flex-direction: column; justify-content: space-between; }
 .v-code-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.v-code { font-family: monospace; font-size: 15px; font-weight: 700; color: var(--blue); background: #EFF6FF; padding: 3px 10px; border-radius: 6px; border: 1.5px dashed #BFDBFE; width: fit-content; letter-spacing: 0.5px; }
+.v-code { font-family: monospace; font-size: 15px; font-weight: 700; color: var(--blue); background: #FAF0F1; padding: 3px 10px; border-radius: 6px; border: 1.5px dashed #FCA5A5; width: fit-content; letter-spacing: 0.5px; }
 .v-desc { font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.4; margin-bottom: 8px; }
 .v-meta { font-size: 11.5px; color: var(--muted); display: flex; align-items: center; gap: 14px; }
 .v-copy-btn { border: none; background: var(--blue); color: #fff; font-size: 11.5px; font-weight: 700; padding: 6px 14px; border-radius: 8px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
-.v-copy-btn:hover { background: #1D4ED8; }
+.v-copy-btn:hover { background: var(--indigo); }
 .v-copy-btn.copied { background: #10B981; }
 
 /* PRIVILEGE SIDE CARD */
