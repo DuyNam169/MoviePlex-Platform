@@ -150,7 +150,7 @@ if (empty($hero_movies) && !empty($movies_showing)) {
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --blue:#2563EB;--blue-h:#1D4ED8;--blue-light:#EFF6FF;
+  --blue:#DF1730;--blue-h:#C21025;--blue-light:#FAF0F1;
   --sidebar:#0F172A;--sidebar-w:240px;
   --bg:#F1F5F9;--card:#fff;
   --text:#0F172A;--muted:#64748B;--light:#94A3B8;--border:#E2E8F0;
@@ -191,7 +191,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 .hero-overlay{position:absolute;inset:0;background:linear-gradient(to right,rgba(15,23,42,.92) 0%,rgba(15,23,42,.4) 60%,transparent 100%);z-index:3}
 .hero-content{position:absolute;inset:0;display:flex;align-items:center;padding:40px 44px;gap:32px;z-index:4}
 .hero-poster{width:120px;height:170px;border-radius:12px;object-fit:cover;box-shadow:0 8px 32px rgba(0,0,0,.6);flex-shrink:0}
-.hero-poster-ph{width:120px;height:170px;border-radius:12px;background:linear-gradient(135deg,#334155,#1e293b);flex-shrink:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.2);font-size:36px}
+.hero-poster-ph{width:120px;height:170px;border-radius:12px;background:#1e293b;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.2);font-size:36px}
 .hero-info{color:#fff;max-width:420px}
 
 /* Premium text transitions on active slide */
@@ -260,7 +260,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 .hero-ctrl:hover {
   background: rgba(255, 255, 255, 0.2);
   border-color: var(--blue);
-  box-shadow: 0 0 12px rgba(37,99,235,0.4);
+  box-shadow: 0 0 12px rgba(223,23,48,0.4);
   color: #fff;
 }
 .hero-prev { left: 16px; }
@@ -315,7 +315,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 .movie-card{background:var(--card);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);cursor:pointer;transition:transform .2s,box-shadow .2s;text-decoration:none;display:block}
 .movie-card:hover{transform:translateY(-4px);box-shadow:0 8px 32px rgba(15,23,42,.14)}
 .mc-poster{width:100%;aspect-ratio:2/3;object-fit:cover;background:#e2e8f0;display:block}
-.mc-poster-ph{width:100%;aspect-ratio:2/3;background:linear-gradient(135deg,#334155,#1e293b);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.2);font-size:32px}
+.mc-poster-ph{width:100%;aspect-ratio:2/3;background:#1e293b;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.2);font-size:32px}
 .mc-body{padding:12px}
 .mc-title{font-size:13.5px;font-weight:700;color:var(--text);margin-bottom:5px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .mc-genre{font-size:11.5px;color:var(--muted);margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -324,7 +324,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 .mc-age{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:#FEF3C7;color:#92400E}
 .mc-age.t18{background:#FEE2E2;color:#991B1B}
 .mc-age.t13{background:#DCFCE7;color:#166534}
-.mc-badge{position:absolute;top:8px;left:8px;background:#2563EB;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px}
+.mc-badge{position:absolute;top:8px;left:8px;background:var(--blue);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px}
 .mc-wrap{position:relative;overflow:hidden;border-radius:var(--radius) var(--radius) 0 0}
 /* Hover overlay for movie-card */
 .mc-overlay {
@@ -348,7 +348,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 }
 .mc-book-btn {
   width: 100%;
-  background: linear-gradient(135deg, var(--blue), #7C3AED);
+  background: var(--blue);
   color: #fff;
   border: none;
   border-radius: 10px;
@@ -360,7 +360,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
   justify-content: center;
   gap: 6px;
   transition: all 0.2s;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 4px 12px rgba(223, 23, 48, 0.3);
 }
 .mc-book-btn:hover {
   filter: brightness(1.1);
@@ -389,10 +389,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 }
 
 /* ── PROMO BANNER ── */
-.promo{border-radius:18px;background:linear-gradient(135deg,#2563EB 0%,#7C3AED 100%);padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:32px}
+.promo{border-radius:18px;background:#1E1E24;padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:32px}
 .promo-text h3{font-size:20px;font-weight:800;color:#fff;margin-bottom:6px}
 .promo-text p{font-size:14px;color:rgba(255,255,255,.8);line-height:1.5}
-.btn-promo{height:40px;padding:0 20px;background:#fff;color:#2563EB;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;text-decoration:none;display:flex;align-items:center;transition:opacity .2s;flex-shrink:0}
+.btn-promo{height:40px;padding:0 20px;background:#fff;color:var(--blue);border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;text-decoration:none;display:flex;align-items:center;transition:opacity .2s;flex-shrink:0}
 .btn-promo:hover{opacity:.9}
 
 /* ── UPCOMING CARD ── */
@@ -400,7 +400,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 .uc{background:var(--card);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);display:flex;gap:14px;padding:14px;align-items:center;cursor:pointer;transition:box-shadow .2s}
 .uc:hover{box-shadow:0 4px 24px rgba(15,23,42,.12)}
 .uc-poster{width:50px;height:70px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#e2e8f0}
-.uc-poster-ph{width:50px;height:70px;border-radius:8px;flex-shrink:0;background:linear-gradient(135deg,#334155,#1e293b);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.2);font-size:18px}
+.uc-poster-ph{width:50px;height:70px;border-radius:8px;flex-shrink:0;background:#1e293b;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.2);font-size:18px}
 .uc-info{flex:1;min-width:0}
 .uc-title{font-size:13px;font-weight:700;margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .uc-genre{font-size:11px;color:var(--muted);margin-bottom:8px}
@@ -515,7 +515,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
           <?php endforeach; ?>
         <?php else: ?>
           <div class="hero-slide active" data-slide-index="0">
-            <div class="hero-bg" style="background:linear-gradient(135deg,#0F172A,#1E1045)"></div>
+            <div class="hero-bg" style="background:#0F172A"></div>
             <div class="hero-overlay"></div>
             <div class="hero-content">
               <div class="hero-poster-ph"><i class="fa-solid fa-film"></i></div>
