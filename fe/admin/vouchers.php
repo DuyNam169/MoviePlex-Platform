@@ -4,89 +4,6 @@ if (empty($_SESSION['user_id']) || !in_array($_SESSION['user_role'], ['admin', '
     header('Location: ../pages/login.php');
     exit;
 }
-
-require_once __DIR__ . '/../../be/config/db.php';
-
-$message = '';
-$messageType = '';
-
-// Handle CREATE / UPDATE / DELETE operations
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
-
-    if ($action === 'save') {
-        $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
-        $code = strtoupper(trim($_POST['code'] ?? ''));
-        $description = trim($_POST['description'] ?? '');
-        $discount_type = $_POST['discount_type'] ?? 'pct';
-        $discount_val = (int)($_POST['discount_value'] ?? 0);
-        $min_order = (int)($_POST['min_order'] ?? 0);
-        $max_uses = (int)($_POST['max_uses'] ?? 100);
-        $expire_date = $_POST['expire_date'] ?? null;
-        $is_active = isset($_POST['is_active']) ? (int)$_POST['is_active'] : 1;
-
-        $discount_pct = 0;
-        $discount_amt = 0;
-        if ($discount_type === 'pct') {
-            $discount_pct = min(100, max(0, $discount_val));
-        } else {
-            $discount_amt = max(0, $discount_val);
-        }
-
-        if ($code && $description) {
-            try {
-                if ($id > 0) {
-                    // Update
-                    $stmt = $pdo->prepare("UPDATE vouchers SET code=?, description=?, discount_pct=?, discount_amt=?, min_order=?, max_uses=?, expire_date=?, is_active=? WHERE id=?");
-                    $stmt->execute([$code, $description, $discount_pct, $discount_amt, $min_order, $max_uses, $expire_date ?: null, $is_active, $id]);
-                    $message = "Đã cập nhật voucher <b>$code</b> thành công!";
-                } else {
-                    // Create
-                    $stmt = $pdo->prepare("INSERT INTO vouchers (code, description, discount_pct, discount_amt, min_order, max_uses, expire_date, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-                    $stmt->execute([$code, $description, $discount_pct, $discount_amt, $min_order, $max_uses, $expire_date ?: null, $is_active]);
-                    $message = "Đã thêm voucher mới <b>$code</b> thành công!";
-                }
-                $messageType = 'success';
-            } catch (Exception $e) {
-                $message = "Lỗi: " . $e->getMessage();
-                $messageType = 'error';
-            }
-        } else {
-            $message = "Vui lòng nhập đầy đủ Mã và Mô tả voucher.";
-            $messageType = 'error';
-        }
-    } elseif ($action === 'delete') {
-        $id = (int)($_POST['id'] ?? 0);
-        if ($id > 0) {
-            try {
-                $stmt = $pdo->prepare("DELETE FROM vouchers WHERE id = ?");
-                $stmt->execute([$id]);
-                $message = "Đã xóa voucher thành công!";
-                $messageType = 'success';
-            } catch (Exception $e) {
-                $message = "Không thể xóa voucher này do đang có đơn hàng liên kết.";
-                $messageType = 'error';
-            }
-        }
-    } elseif ($action === 'toggle_active') {
-        $id = (int)($_POST['id'] ?? 0);
-        $status = (int)($_POST['status'] ?? 1);
-        if ($id > 0) {
-            $stmt = $pdo->prepare("UPDATE vouchers SET is_active = ? WHERE id = ?");
-            $stmt->execute([$status, $id]);
-            $message = "Đã thay đổi trạng thái hoạt động của voucher!";
-            $messageType = 'success';
-        }
-    }
-}
-
-// Fetch stats (only master templates/campaigns where user_id IS NULL)
-$total_vouchers = $pdo->query("SELECT COUNT(*) FROM vouchers WHERE user_id IS NULL")->fetchColumn();
-$active_vouchers = $pdo->query("SELECT COUNT(*) FROM vouchers WHERE user_id IS NULL AND is_active = 1 AND (expire_date IS NULL OR expire_date >= CURDATE())")->fetchColumn();
-$expired_vouchers = $pdo->query("SELECT COUNT(*) FROM vouchers WHERE user_id IS NULL AND (is_active = 0 OR (expire_date IS NOT NULL AND expire_date < CURDATE()))")->fetchColumn();
-
-// Fetch voucher list (only master templates/campaigns where user_id IS NULL)
-$vouchers = $pdo->query("SELECT * FROM vouchers WHERE user_id IS NULL ORDER BY id DESC")->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -426,20 +343,12 @@ $vouchers = $pdo->query("SELECT * FROM vouchers WHERE user_id IS NULL ORDER BY i
                     </div>
                 </div>
 
-                <!-- Alert Message -->
-                <?php if ($message): ?>
-                <div class="alert-bar <?= $messageType ?>">
-                    <i class="fa-solid <?= $messageType === 'success' ? 'fa-circle-check' : 'fa-triangle-exclamation' ?>"></i>
-                    <span><?= $message ?></span>
-                </div>
-                <?php endif; ?>
-
                 <!-- Voucher Stats -->
                 <div class="stat-cards-bottom" style="margin-bottom: 24px; margin-top: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
                     <div class="admin-stat-card">
                         <div class="admin-stat-info">
                             <span class="title">TỔNG SỐ VOUCHER</span>
-                            <span class="value" id="stat-total"><?= $total_vouchers ?></span>
+                            <span class="value" id="stat-total">0</span>
                             <span class="desc">Chương trình khuyến mãi</span>
                         </div>
                         <div class="admin-stat-icon blue">
@@ -449,7 +358,7 @@ $vouchers = $pdo->query("SELECT * FROM vouchers WHERE user_id IS NULL ORDER BY i
                     <div class="admin-stat-card">
                         <div class="admin-stat-info">
                             <span class="title">ĐANG HOẠT ĐỘNG</span>
-                            <span class="value" style="color: #10B981;" id="stat-active"><?= $active_vouchers ?></span>
+                            <span class="value" style="color: #10B981;" id="stat-active">0</span>
                             <span class="desc" style="color: #10B981;"><i class="fa-solid fa-circle" style="font-size: 8px; margin-right: 4px; vertical-align: middle;"></i> Đang có hiệu lực</span>
                         </div>
                         <div class="admin-stat-icon green">
@@ -459,7 +368,7 @@ $vouchers = $pdo->query("SELECT * FROM vouchers WHERE user_id IS NULL ORDER BY i
                     <div class="admin-stat-card">
                         <div class="admin-stat-info">
                             <span class="title">ĐÃ HẾT HẠN / TẮT</span>
-                            <span class="value" style="color: #EF4444;" id="stat-expired"><?= $expired_vouchers ?></span>
+                            <span class="value" style="color: #EF4444;" id="stat-expired">0</span>
                             <span class="desc" style="color: #EF4444;">Không còn sử dụng</span>
                         </div>
                         <div class="admin-stat-icon red">
@@ -496,104 +405,10 @@ $vouchers = $pdo->query("SELECT * FROM vouchers WHERE user_id IS NULL ORDER BY i
 
                     <!-- VOUCHER CARDS GRID -->
                     <div class="vouchers-admin-grid" id="vouchersBody">
-                        <?php if (empty($vouchers)): ?>
-                            <div style="text-align:center; padding:60px 20px; color:var(--text-muted); grid-column:1 / -1;">
-                                <i class="fa-solid fa-tag" style="font-size:48px; opacity:.2; display:block; margin-bottom:12px"></i>
-                                <h3 style="font-size:15px; font-weight:700">Không tìm thấy voucher nào</h3>
-                            </div>
-                        <?php else: ?>
-                            <?php foreach ($vouchers as $v): 
-                                $is_expired = ($v['expire_date'] !== null && strtotime($v['expire_date']) < strtotime(date('Y-m-d')));
-                                $status_class = 'inactive';
-                                $status_text = 'Đã tắt';
-                                if ($v['is_active'] == 1) {
-                                    if ($is_expired) {
-                                        $status_class = 'expired';
-                                        $status_text = 'Hết hạn';
-                                    } else {
-                                        $status_class = 'active';
-                                        $status_text = 'Đang chạy';
-                                    }
-                                }
-                                $valText = $v['discount_pct'] > 0 ? $v['discount_pct'] . '%' : number_format($v['discount_amt']/1000) . 'K';
-                                $typeText = $v['discount_pct'] > 0 ? 'GIẢM GIÁ' : 'TIỀN MẶT';
-                                $type_val = $v['discount_pct'] > 0 ? 'percentage' : 'fixed';
-                                $isActive = ($v['is_active'] == 1 && !$is_expired);
-                                
-                                // Determine voucher type
-                                $type_badge = '';
-                                if ($v['user_id'] !== null) {
-                                    $type_badge = '<span style="font-size: 9px; font-weight: 800; background: #FFF7ED; color: #EA580C; padding: 2px 6px; border-radius: 4px; border: 1px solid #FFEDD5; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-solid fa-user"></i> KH đã đổi</span>';
-                                } elseif (in_array($v['code'], ['REDM30K', 'REDM50K', 'REDM100K', 'GIFTPOP'])) {
-                                    $type_badge = '<span style="font-size: 9px; font-weight: 800; background: #EEF2F6; color: #4F46E5; padding: 2px 6px; border-radius: 4px; border: 1px solid #C7D2FE; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-solid fa-gift"></i> Shop đổi quà</span>';
-                                } else {
-                                    $type_badge = '<span style="font-size: 9px; font-weight: 800; background: #ECFDF5; color: #059669; padding: 2px 6px; border-radius: 4px; border: 1px solid #A7F3D0; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-solid fa-globe"></i> Mặc định / Sự kiện</span>';
-                                }
-                            ?>
-                            <div class="admin-voucher-card" data-type="<?= $type_val ?>" data-status="<?= $status_class ?>" data-code="<?= htmlspecialchars($v['code']) ?>" data-desc="<?= htmlspecialchars($v['description']) ?>">
-                                <div class="admin-voucher-left <?= $isActive ? '' : 'inactive-left' ?>">
-                                    <span class="admin-v-val"><?= $valText ?></span>
-                                    <span class="admin-v-type"><?= $typeText ?></span>
-                                </div>
-                                <div class="admin-voucher-right">
-                                    <div>
-                                        <div class="admin-v-header">
-                                            <span class="admin-v-code <?= $isActive ? '' : 'inactive-code' ?>"><?= htmlspecialchars($v['code']) ?></span>
-                                            <?= $type_badge ?>
-                                        </div>
-                                        <div class="admin-v-desc"><?= htmlspecialchars($v['description']) ?></div>
-                                    </div>
-                                    
-                                    <div>
-                                        <div class="admin-v-meta">
-                                            <div class="admin-v-meta-item">
-                                                <i class="fa-regular fa-user"></i>
-                                                <span>Lượt dùng: <strong><?= $v['used_count'] ?></strong> / <?= $v['max_uses'] ?></span>
-                                            </div>
-                                            <div class="admin-v-meta-item">
-                                                <i class="fa-solid fa-circle-info"></i>
-                                                <span>Đơn tối thiểu: <strong><?= number_format($v['min_order'], 0, ',', '.') ?>₫</strong></span>
-                                            </div>
-                                            <div class="admin-v-meta-item">
-                                                <i class="fa-regular fa-clock"></i>
-                                                <span>HSD: <strong><?= $v['expire_date'] ? date('d/m/Y', strtotime($v['expire_date'])) : 'Vô thời hạn' ?></strong></span>
-                                            </div>
-                                            <div class="admin-v-meta-item">
-                                                <i class="fa-solid fa-circle-check"></i>
-                                                <span>Trạng thái: <span class="badge-status <?= $status_class ?>" style="padding: 2px 8px; font-size:10px;"><?= $status_text ?></span></span>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="admin-v-actions">
-                                            <!-- Toggle Switch Form -->
-                                            <form method="POST" style="margin: 0; display: inline-flex; align-items: center;">
-                                                <input type="hidden" name="action" value="toggle_active">
-                                                <input type="hidden" name="id" value="<?= $v['id'] ?>">
-                                                <input type="hidden" name="status" value="<?= $v['is_active'] == 1 ? 0 : 1 ?>">
-                                                <button type="submit" class="admin-toggle-btn" title="<?= $v['is_active'] == 1 ? 'Tắt hoạt động' : 'Kích hoạt' ?>">
-                                                    <i class="fa-solid <?= $v['is_active'] == 1 ? 'fa-toggle-on' : 'fa-toggle-off' ?>" style="font-size: 24px; color: <?= $v['is_active'] == 1 ? 'var(--success-text)' : 'var(--text-muted)' ?>; transition: color 0.2s;"></i>
-                                                    <span style="font-size: 11.5px; font-weight: 700; color: #4B5563; margin-left: 6px;"><?= $v['is_active'] == 1 ? 'Đang bật' : 'Đang tắt' ?></span>
-                                                </button>
-                                            </form>
-                                            
-                                            <!-- Edit / Delete Actions -->
-                                            <div class="action-btns" style="margin: 0;">
-                                                <button class="action-btn edit" title="Chỉnh sửa" onclick='openEditModal(<?= json_encode($v) ?>)' style="padding: 5px 8px; border: 1.5px solid #D1D5DB; border-radius: 8px;"><i class="fa-solid fa-pen-to-square"></i></button>
-                                                
-                                                <form method="POST" id="delete-voucher-form-<?= $v['id'] ?>" style="display:none;">
-                                                    <input type="hidden" name="action" value="delete">
-                                                    <input type="hidden" name="id" value="<?= $v['id'] ?>">
-                                                </form>
-                                                <button type="button" class="action-btn delete" title="Xóa" style="padding: 5px 8px; border: 1.5px solid rgba(239, 68, 68, 0.2); border-radius: 8px;" onclick="confirmDeleteVoucher(<?= $v['id'] ?>, '<?= $v['code'] ?>')">
-                                                    <i class="fa-solid fa-trash-can"></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
+                        <div style="text-align:center; padding:60px 20px; color:var(--text-muted); grid-column:1 / -1;">
+                            <i class="fa-solid fa-spinner fa-spin" style="font-size:32px; display:block; margin-bottom:12px"></i>
+                            <h3 style="font-size:15px; font-weight:700">Đang tải danh sách voucher...</h3>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -611,7 +426,7 @@ $vouchers = $pdo->query("SELECT * FROM vouchers WHERE user_id IS NULL ORDER BY i
                 <button class="close-modal" onclick="closeModal()" style="border:none; background:none; font-size:20px; cursor:pointer; color:var(--text-muted);"><i class="fa-solid fa-xmark"></i></button>
             </div>
             
-            <form method="POST">
+            <form id="voucherForm">
                 <input type="hidden" name="action" value="save">
                 <input type="hidden" name="id" id="form-id" value="0">
                 
@@ -672,6 +487,204 @@ $vouchers = $pdo->query("SELECT * FROM vouchers WHERE user_id IS NULL ORDER BY i
     </div>
 
     <script>
+        let allVouchers = [];
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.toString()
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function escapeQuote(text) {
+            if (!text) return '';
+            return text.toString().replace(/'/g, "\\'");
+        }
+
+        async function fetchStats() {
+            try {
+                const res = await fetch('../../be/controllers/admin/AdminVoucherController.php?action=stats');
+                const json = await res.json();
+                if (json.success) {
+                    document.getElementById('stat-total').textContent = json.stats.total;
+                    document.getElementById('stat-active').textContent = json.stats.active;
+                    document.getElementById('stat-expired').textContent = json.stats.expired;
+                }
+            } catch (e) {
+                console.error('Error fetching stats:', e);
+            }
+        }
+
+        async function fetchVouchers() {
+            try {
+                const res = await fetch('../../be/controllers/admin/AdminVoucherController.php?action=list');
+                const json = await res.json();
+                if (json.success) {
+                    allVouchers = json.data;
+                    renderVouchers(allVouchers);
+                } else {
+                    document.getElementById('vouchersBody').innerHTML = `
+                        <div style="text-align:center; padding:60px 20px; color:var(--text-muted); grid-column:1 / -1;">
+                            <i class="fa-solid fa-triangle-exclamation" style="font-size:48px; opacity:.4; display:block; margin-bottom:12px"></i>
+                            <h3 style="font-size:15px; font-weight:700">Lỗi: ${json.message}</h3>
+                        </div>`;
+                }
+            } catch (e) {
+                console.error('Error fetching vouchers:', e);
+                document.getElementById('vouchersBody').innerHTML = `
+                    <div style="text-align:center; padding:60px 20px; color:var(--text-muted); grid-column:1 / -1;">
+                        <i class="fa-solid fa-triangle-exclamation" style="font-size:48px; opacity:.4; display:block; margin-bottom:12px"></i>
+                        <h3 style="font-size:15px; font-weight:700">Không thể kết nối máy chủ.</h3>
+                    </div>`;
+            }
+        }
+
+        function renderVouchers(vouchersList) {
+            const container = document.getElementById('vouchersBody');
+            container.innerHTML = '';
+            
+            if (vouchersList.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align:center; padding:60px 20px; color:var(--text-muted); grid-column:1 / -1;">
+                        <i class="fa-solid fa-tag" style="font-size:48px; opacity:.2; display:block; margin-bottom:12px"></i>
+                        <h3 style="font-size:15px; font-weight:700">Không tìm thấy voucher nào</h3>
+                    </div>`;
+                return;
+            }
+            
+            const todayStr = new Date().toISOString().split('T')[0];
+            
+            vouchersList.forEach(v => {
+                const isExpired = v.expire_date !== null && v.expire_date < todayStr;
+                let statusClass = 'inactive';
+                let statusText = 'Đã tắt';
+                if (parseInt(v.is_active) === 1) {
+                    if (isExpired) {
+                        statusClass = 'expired';
+                        statusText = 'Hết hạn';
+                    } else {
+                        statusClass = 'active';
+                        statusText = 'Đang chạy';
+                    }
+                }
+                
+                const valText = parseInt(v.discount_pct) > 0 ? v.discount_pct + '%' : (parseInt(v.discount_amt)/1000) + 'K';
+                const typeText = parseInt(v.discount_pct) > 0 ? 'GIẢM GIÁ' : 'TIỀN MẶT';
+                const typeVal = parseInt(v.discount_pct) > 0 ? 'percentage' : 'fixed';
+                const isActive = (parseInt(v.is_active) === 1 && !isExpired);
+                
+                let typeBadge = '';
+                if (v.user_id !== null) {
+                    typeBadge = `<span style="font-size: 9px; font-weight: 800; background: #FFF7ED; color: #EA580C; padding: 2px 6px; border-radius: 4px; border: 1px solid #FFEDD5; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-solid fa-user"></i> KH đã đổi</span>`;
+                } else if (['REDM30K', 'REDM50K', 'REDM100K', 'GIFTPOP'].includes(v.code)) {
+                    typeBadge = `<span style="font-size: 9px; font-weight: 800; background: #EEF2F6; color: #4F46E5; padding: 2px 6px; border-radius: 4px; border: 1px solid #C7D2FE; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-solid fa-gift"></i> Shop đổi quà</span>`;
+                } else {
+                    typeBadge = `<span style="font-size: 9px; font-weight: 800; background: #ECFDF5; color: #059669; padding: 2px 6px; border-radius: 4px; border: 1px solid #A7F3D0; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-solid fa-globe"></i> Mặc định / Sự kiện</span>`;
+                }
+                
+                const formattedMinOrder = new Intl.NumberFormat('vi-VN').format(v.min_order);
+                
+                let formattedExpire = 'Vô thời hạn';
+                if (v.expire_date) {
+                    const parts = v.expire_date.split('-');
+                    formattedExpire = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                }
+                
+                const card = document.createElement('div');
+                card.className = 'admin-voucher-card';
+                card.dataset.type = typeVal;
+                card.dataset.status = statusClass;
+                card.dataset.code = v.code;
+                card.dataset.desc = v.description;
+                
+                card.innerHTML = `
+                    <div class="admin-voucher-left ${isActive ? '' : 'inactive-left'}">
+                        <span class="admin-v-val">${valText}</span>
+                        <span class="admin-v-type">${typeText}</span>
+                    </div>
+                    <div class="admin-voucher-right">
+                        <div>
+                            <div class="admin-v-header">
+                                <span class="admin-v-code ${isActive ? '' : 'inactive-code'}">${escapeHtml(v.code)}</span>
+                                ${typeBadge}
+                            </div>
+                            <div class="admin-v-desc">${escapeHtml(v.description)}</div>
+                        </div>
+                        
+                        <div>
+                            <div class="admin-v-meta">
+                                <div class="admin-v-meta-item">
+                                    <i class="fa-regular fa-user"></i>
+                                    <span>Lượt dùng: <strong>${v.used_count}</strong> / ${v.max_uses}</span>
+                                </div>
+                                <div class="admin-v-meta-item">
+                                    <i class="fa-solid fa-circle-info"></i>
+                                    <span>Đơn tối thiểu: <strong>${formattedMinOrder}₫</strong></span>
+                                </div>
+                                <div class="admin-v-meta-item">
+                                    <i class="fa-regular fa-clock"></i>
+                                    <span>HSD: <strong>${formattedExpire}</strong></span>
+                                </div>
+                                <div class="admin-v-meta-item">
+                                    <i class="fa-solid fa-circle-check"></i>
+                                    <span>Trạng thái: <span class="badge-status ${statusClass}" style="padding: 2px 8px; font-size:10px;">${statusText}</span></span>
+                                </div>
+                            </div>
+                            
+                            <div class="admin-v-actions">
+                                <!-- Toggle Switch -->
+                                <button type="button" class="admin-toggle-btn" title="${parseInt(v.is_active) === 1 ? 'Tắt hoạt động' : 'Kích hoạt'}" onclick="toggleVoucherStatus(${v.id}, ${parseInt(v.is_active) === 1 ? 0 : 1})">
+                                    <i class="fa-solid ${parseInt(v.is_active) === 1 ? 'fa-toggle-on' : 'fa-toggle-off'}" style="font-size: 24px; color: ${parseInt(v.is_active) === 1 ? 'var(--success-text)' : 'var(--text-muted)'}; transition: color 0.2s;"></i>
+                                    <span style="font-size: 11.5px; font-weight: 700; color: #4B5563; margin-left: 6px;">${parseInt(v.is_active) === 1 ? 'Đang bật' : 'Đang tắt'}</span>
+                                </button>
+                                
+                                <!-- Edit / Delete Actions -->
+                                <div class="action-btns" style="margin: 0;">
+                                    <button class="action-btn edit" title="Chỉnh sửa" onclick="openEditModal(${v.id})" style="padding: 5px 8px; border: 1.5px solid #D1D5DB; border-radius: 8px;"><i class="fa-solid fa-pen-to-square"></i></button>
+                                    <button type="button" class="action-btn delete" title="Xóa" style="padding: 5px 8px; border: 1.5px solid rgba(239, 68, 68, 0.2); border-radius: 8px;" onclick="confirmDeleteVoucher(${v.id}, '${escapeQuote(v.code)}')">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+            
+            // Run table filtering in case user currently has query or filter active
+            filterTable();
+        }
+
+        async function toggleVoucherStatus(id, newStatus) {
+            try {
+                const formData = new FormData();
+                formData.append('action', 'toggle_active');
+                formData.append('id', id);
+                formData.append('status', newStatus);
+                
+                const res = await fetch('../../be/controllers/admin/AdminVoucherController.php?action=toggle_active', {
+                    method: 'POST',
+                    body: formData
+                });
+                const json = await res.json();
+                
+                if (json.success) {
+                    mfToast('Thành công', json.message || 'Cập nhật trạng thái thành công!', 'success');
+                    await fetchVouchers();
+                    await fetchStats();
+                } else {
+                    mfToast('Lỗi', json.message || 'Không thể cập nhật trạng thái.', 'danger');
+                }
+            } catch (e) {
+                console.error('Error toggling voucher status:', e);
+                mfToast('Lỗi hệ thống', 'Không thể kết nối máy chủ.', 'warning');
+            }
+        }
+
         async function confirmDeleteVoucher(id, code) {
             const ok = await mfConfirm({
                 title: 'Xóa mã Voucher',
@@ -681,8 +694,66 @@ $vouchers = $pdo->query("SELECT * FROM vouchers WHERE user_id IS NULL ORDER BY i
                 confirmIcon: 'fa-trash-can',
                 cancelText: 'Giữ lại'
             });
-            if (ok) document.getElementById(`delete-voucher-form-${id}`).submit();
+            if (ok) {
+                try {
+                    const formData = new FormData();
+                    formData.append('action', 'delete');
+                    formData.append('id', id);
+                    
+                    const res = await fetch('../../be/controllers/admin/AdminVoucherController.php?action=delete', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const json = await res.json();
+                    
+                    if (json.success) {
+                        mfToast('Thành công', json.message || 'Xóa voucher thành công!', 'success');
+                        await fetchVouchers();
+                        await fetchStats();
+                    } else {
+                        mfToast('Lỗi khi xóa', json.message || 'Đã xảy ra lỗi khi xóa voucher.', 'danger');
+                    }
+                } catch (e) {
+                    console.error('Error deleting voucher:', e);
+                    mfToast('Lỗi hệ thống', 'Không thể kết nối máy chủ.', 'warning');
+                }
+            }
         }
+
+        document.getElementById('voucherForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalBtnHTML = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...';
+            
+            try {
+                const formData = new FormData(this);
+                formData.set('action', 'save');
+                
+                const res = await fetch('../../be/controllers/admin/AdminVoucherController.php?action=save', {
+                    method: 'POST',
+                    body: formData
+                });
+                const json = await res.json();
+                
+                if (json.success) {
+                    mfToast('Thành công', json.message || 'Lưu voucher thành công!', 'success');
+                    closeModal();
+                    await fetchVouchers();
+                    await fetchStats();
+                } else {
+                    mfToast('Lỗi', json.message || 'Có lỗi xảy ra khi lưu voucher.', 'danger');
+                }
+            } catch (err) {
+                console.error('Error saving voucher:', err);
+                mfToast('Lỗi hệ thống', 'Không thể kết nối máy chủ. Vui lòng thử lại.', 'warning');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHTML;
+            }
+        });
 
         function openAddModal() {
             document.getElementById('modal-title-text').textContent = 'Thêm Voucher mới';
@@ -701,7 +772,10 @@ $vouchers = $pdo->query("SELECT * FROM vouchers WHERE user_id IS NULL ORDER BY i
             document.getElementById('voucherModal').classList.add('active');
         }
 
-        function openEditModal(v) {
+        function openEditModal(id) {
+            const v = allVouchers.find(item => item.id == id);
+            if (!v) return;
+            
             document.getElementById('modal-title-text').textContent = 'Chỉnh sửa Voucher #' + v.code;
             document.getElementById('form-id').value = v.id;
             document.getElementById('form-code').value = v.code;
@@ -797,8 +871,11 @@ $vouchers = $pdo->query("SELECT * FROM vouchers WHERE user_id IS NULL ORDER BY i
                 container.appendChild(emptyDiv);
             }
         }
+
+        // Initialize Page
+        fetchStats();
+        fetchVouchers();
     </script>
     <script src="../assets/js/script.js"></script>
 </body>
 </html>
-

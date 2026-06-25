@@ -180,4 +180,186 @@ if ($action === 'get_employees') {
     exit;
 }
 
+if ($action === 'get_revenue_report') {
+    try {
+        $startDate = $_GET['startDate'] ?? '';
+        $endDate = $_GET['endDate'] ?? '';
+
+        if (!empty($startDate) && !empty($endDate)) {
+            $filter = 'custom';
+        } else {
+            $filter = $_GET['filter'] ?? 'today';
+            if ($filter === 'week') {
+                $startDate = date('Y-m-d', strtotime('monday this week'));
+                $endDate = date('Y-m-d', strtotime('sunday this week'));
+            } elseif ($filter === 'month') {
+                $startDate = date('Y-m-01');
+                $endDate = date('Y-m-t');
+            } elseif ($filter === 'year') {
+                $startDate = date('Y-01-01');
+                $endDate = date('Y-12-31');
+            } else {
+                $filter = 'today';
+                $startDate = date('Y-m-d');
+                $endDate = date('Y-m-d');
+            }
+        }
+
+        $safe_start = $pdo->quote($startDate);
+        $safe_end = $pdo->quote($endDate);
+
+        $where_time = "DATE(created_at) BETWEEN $safe_start AND $safe_end";
+        $where_time_b = "DATE(b.created_at) BETWEEN $safe_start AND $safe_end";
+
+        // 1. Overall stats
+        $total_revenue = (float)($pdo->query("SELECT SUM(total_amount) FROM bookings WHERE status != 'cancelled' AND $where_time")->fetchColumn() ?: 0);
+        $total_tickets = (int)($pdo->query("SELECT SUM(num_tickets) FROM bookings WHERE status != 'cancelled' AND $where_time")->fetchColumn() ?: 0);
+        $total_bookings = (int)($pdo->query("SELECT COUNT(*) FROM bookings WHERE status != 'cancelled' AND $where_time")->fetchColumn() ?: 0);
+
+        $ticket_revenue = (float)($pdo->query("SELECT SUM(subtotal) FROM bookings WHERE status != 'cancelled' AND $where_time")->fetchColumn() ?: 0);
+        $snack_revenue = (float)($pdo->query("SELECT SUM(GREATEST(0, total_amount - subtotal + discount)) FROM bookings WHERE status != 'cancelled' AND $where_time")->fetchColumn() ?: 0);
+
+        // Online stats
+        $online_revenue = (float)($pdo->query("SELECT SUM(total_amount) FROM bookings WHERE status != 'cancelled' AND payment_method != 'cash' AND $where_time")->fetchColumn() ?: 0);
+        $online_tickets = (int)($pdo->query("SELECT SUM(num_tickets) FROM bookings WHERE status != 'cancelled' AND payment_method != 'cash' AND $where_time")->fetchColumn() ?: 0);
+        $online_bookings = (int)($pdo->query("SELECT COUNT(*) FROM bookings WHERE status != 'cancelled' AND payment_method != 'cash' AND $where_time")->fetchColumn() ?: 0);
+        $online_ticket_revenue = (float)($pdo->query("SELECT SUM(subtotal) FROM bookings WHERE status != 'cancelled' AND payment_method != 'cash' AND $where_time")->fetchColumn() ?: 0);
+        $online_snack_revenue = (float)($pdo->query("SELECT SUM(GREATEST(0, total_amount - subtotal + discount)) FROM bookings WHERE status != 'cancelled' AND payment_method != 'cash' AND $where_time")->fetchColumn() ?: 0);
+
+        // Direct / Counter stats
+        $direct_revenue = (float)($pdo->query("SELECT SUM(total_amount) FROM bookings WHERE status != 'cancelled' AND payment_method = 'cash' AND $where_time")->fetchColumn() ?: 0);
+        $direct_tickets = (int)($pdo->query("SELECT SUM(num_tickets) FROM bookings WHERE status != 'cancelled' AND payment_method = 'cash' AND $where_time")->fetchColumn() ?: 0);
+        $direct_bookings = (int)($pdo->query("SELECT COUNT(*) FROM bookings WHERE status != 'cancelled' AND payment_method = 'cash' AND $where_time")->fetchColumn() ?: 0);
+        $direct_ticket_revenue = (float)($pdo->query("SELECT SUM(subtotal) FROM bookings WHERE status != 'cancelled' AND payment_method = 'cash' AND $where_time")->fetchColumn() ?: 0);
+        $direct_snack_revenue = (float)($pdo->query("SELECT SUM(GREATEST(0, total_amount - subtotal + discount)) FROM bookings WHERE status != 'cancelled' AND payment_method = 'cash' AND $where_time")->fetchColumn() ?: 0);
+
+        // 2. Revenue by Movie
+        $movie_revenue = $pdo->query("
+            SELECT m.title, m.poster_url, COUNT(b.id) as bookings_count, SUM(b.num_tickets) as tickets_count, SUM(b.total_amount) as revenue
+            FROM bookings b
+            JOIN showtimes s ON b.showtime_id = s.id
+            JOIN movies m ON s.movie_id = m.id
+            WHERE b.status != 'cancelled' AND $where_time_b
+            GROUP BY m.id
+            ORDER BY revenue DESC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+
+        // 3. Revenue by Cinema
+        $cinema_revenue = $pdo->query("
+            SELECT c.name as cinema_name, COUNT(b.id) as bookings_count, SUM(b.num_tickets) as tickets_count, SUM(b.total_amount) as revenue
+            FROM bookings b
+            JOIN showtimes s ON b.showtime_id = s.id
+            JOIN cinemas c ON s.cinema_id = c.id
+            WHERE b.status != 'cancelled' AND $where_time_b
+            GROUP BY c.id
+            ORDER BY revenue DESC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+
+        // 4. Detailed Bookings
+        $detailed_bookings = $pdo->query("
+            SELECT b.*, u.full_name as customer_name, m.title as movie_title, c.name as cinema_name
+            FROM bookings b
+            LEFT JOIN users u ON b.user_id = u.id
+            JOIN showtimes s ON b.showtime_id = s.id
+            JOIN movies m ON s.movie_id = m.id
+            JOIN cinemas c ON s.cinema_id = c.id
+            WHERE b.status != 'cancelled' AND $where_time_b
+            ORDER BY b.created_at DESC
+            LIMIT 50
+        ")->fetchAll(PDO::FETCH_ASSOC);
+
+        // 5. Daily Sales Trend
+        if ($startDate === $endDate) {
+            $daily_sales = $pdo->query("
+                SELECT 
+                    DATE_FORMAT(created_at, '%H:00') as day_label, 
+                    SUM(CASE WHEN payment_method != 'cash' THEN total_amount ELSE 0 END) as online_revenue,
+                    SUM(CASE WHEN payment_method = 'cash' THEN total_amount ELSE 0 END) as direct_revenue,
+                    SUM(total_amount) as revenue
+                FROM bookings
+                WHERE status != 'cancelled' AND DATE(created_at) = $safe_start
+                GROUP BY HOUR(created_at)
+                ORDER BY created_at ASC
+            ")->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            $daily_sales = $pdo->query("
+                SELECT 
+                    DATE_FORMAT(created_at, '%d/%m') as day_label, 
+                    SUM(CASE WHEN payment_method != 'cash' THEN total_amount ELSE 0 END) as online_revenue,
+                    SUM(CASE WHEN payment_method = 'cash' THEN total_amount ELSE 0 END) as direct_revenue,
+                    SUM(total_amount) as revenue
+                FROM bookings
+                WHERE status != 'cancelled' AND DATE(created_at) BETWEEN $safe_start AND $safe_end
+                GROUP BY DATE(created_at)
+                ORDER BY DATE(created_at) ASC
+            ")->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        if (empty($daily_sales)) {
+            $daily_sales = [];
+            if ($startDate === $endDate) {
+                for ($h = 8; $h <= 23; $h += 2) {
+                    $daily_sales[] = [
+                        'day_label' => sprintf('%02d:00', $h),
+                        'online_revenue' => 0,
+                        'direct_revenue' => 0,
+                        'revenue' => 0
+                    ];
+                }
+            } else {
+                $curr = strtotime($startDate);
+                $last = strtotime($endDate);
+                $days_diff = round(($last - $curr) / 86400);
+                if ($days_diff <= 31) {
+                    while ($curr <= $last) {
+                        $daily_sales[] = [
+                            'day_label' => date('d/m', $curr),
+                            'online_revenue' => 0,
+                            'direct_revenue' => 0,
+                            'revenue' => 0
+                        ];
+                        $curr = strtotime("+1 day", $curr);
+                    }
+                }
+            }
+        }
+
+        echo json_encode([
+            'success' => true,
+            'startDate' => $startDate,
+            'endDate' => $endDate,
+            'filter' => $filter,
+            'kpis' => [
+                'total_revenue' => $total_revenue,
+                'total_tickets' => $total_tickets,
+                'total_bookings' => $total_bookings,
+                'ticket_revenue' => $ticket_revenue,
+                'snack_revenue' => $snack_revenue,
+                'online' => [
+                    'revenue' => $online_revenue,
+                    'tickets' => $online_tickets,
+                    'bookings' => $online_bookings,
+                    'ticket_revenue' => $online_ticket_revenue,
+                    'snack_revenue' => $online_snack_revenue
+                ],
+                'direct' => [
+                    'revenue' => $direct_revenue,
+                    'tickets' => $direct_tickets,
+                    'bookings' => $direct_bookings,
+                    'ticket_revenue' => $direct_ticket_revenue,
+                    'snack_revenue' => $direct_snack_revenue
+                ]
+            ],
+            'movie_revenue' => $movie_revenue,
+            'cinema_revenue' => $cinema_revenue,
+            'detailed_bookings' => $detailed_bookings,
+            'daily_sales' => $daily_sales
+        ]);
+
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => 'Lỗi hệ thống: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
 echo json_encode(['success' => false, 'message' => 'Unknown action']);
