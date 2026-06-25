@@ -140,3 +140,5 @@ docker compose down
 ## Ghi chú
 
 Dự án phục vụ mục đích học tập — nhóm môn học tại Trường Đại học Công nghệ Giao thông Vận tải (UTT).
+
+thành viên Nam, Phát, Chương, Đúc.
