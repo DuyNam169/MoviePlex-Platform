@@ -25,7 +25,7 @@ $step = $_SESSION['pwd_step'] ?? 1;
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--blue:#2563EB;--bg:#F8FAFC;--card:#fff;--text:#0F172A;--muted:#64748B;--border:#E2E8F0;--r:16px}
+:root{--blue:#DF1730;--indigo:#C21025;--bg:#F8FAFC;--card:#fff;--text:#0F172A;--muted:#64748B;--border:#E2E8F0;--r:16px}
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
 .auth-box{width:100%;max-width:420px;background:var(--card);border-radius:var(--r);box-shadow:0 10px 40px -10px rgba(0,0,0,.08);padding:32px 40px;position:relative;overflow:hidden}
 .auth-box::before{content:'';position:absolute;top:0;left:0;width:100%;height:4px;background:var(--blue)}
@@ -37,9 +37,9 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .frm-grp{margin-bottom:18px}
 .frm-lbl{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:#334155}
 .frm-inp{width:100%;height:46px;border:1.5px solid var(--border);border-radius:10px;padding:0 14px;font-size:14px;font-family:inherit;transition:all .2s;background:#F8FAFC}
-.frm-inp:focus{border-color:var(--blue);background:#fff;outline:none;box-shadow:0 0 0 4px rgba(37,99,235,.1)}
+.frm-inp:focus{border-color:var(--blue);background:#fff;outline:none;box-shadow:0 0 0 4px rgba(223,23,48,.1)}
 .btn-submit{width:100%;height:46px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px}
-.btn-submit:hover:not(:disabled){background:#1D4ED8;transform:translateY(-1px);box-shadow:0 4px 12px rgba(37,99,235,.2)}
+.btn-submit:hover:not(:disabled){background:var(--indigo);transform:translateY(-1px);box-shadow:0 4px 12px rgba(223,23,48,.2)}
 .btn-submit:disabled{opacity:.5;cursor:not-allowed}
 .btn-submit .spin{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .65s linear infinite;display:none}
 .btn-submit.loading .spin{display:block}
@@ -51,7 +51,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .alert-succ{background:#F0FDF4;color:#16A34A;border:1px solid #BBF7D0}
 .auth-footer{margin-top:24px;text-align:center;font-size:14px;color:var(--muted)}
 .auth-footer a{color:var(--blue);text-decoration:none;font-weight:600;transition:color .2s}
-.auth-footer a:hover{color:#1D4ED8}
+.auth-footer a:hover{color:var(--indigo)}
 .btn-resend{background:none;border:none;color:var(--blue);font-weight:600;cursor:pointer;font-family:inherit;font-size:14px;padding:0}
 .btn-resend:hover{text-decoration:underline}
 </style>
@@ -59,7 +59,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 <body>
 
 <div class="auth-box">
-  <a href="/fe/pages/home.php" class="logo">
+  <a href="home.php" class="logo">
     <div class="logo-icon"><i class="fa-solid fa-clapperboard"></i></div>
     <div class="logo-name">MovieFlex</div>
   </a>
@@ -116,12 +116,12 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
 
   <div class="auth-footer">
-    <a href="/fe/pages/login.php"><i class="fa-solid fa-arrow-left"></i> Quay lại đăng nhập</a>
+    <a href="login.php"><i class="fa-solid fa-arrow-left"></i> Quay lại đăng nhập</a>
   </div>
 </div>
 
 <script>
-const ENDPOINT = '/be/api.php';
+const ENDPOINT = '../../be/api.php';
 
 function showMsg(type, text) {
   const el = document.getElementById('msg');
@@ -236,7 +236,7 @@ document.getElementById('btn-s3').addEventListener('click', async () => {
 
     if (d.success) {
       showMsg('succ', d.message);
-      setTimeout(() => location.href = '/fe/pages/login.php', 1500);
+      setTimeout(() => location.href = 'login.php', 1500);
     } else {
       showMsg('err', d.message);
     }

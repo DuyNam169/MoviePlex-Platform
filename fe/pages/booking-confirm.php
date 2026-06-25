@@ -1,10 +1,10 @@
 <?php
 session_start();
-if (empty($_SESSION['user_id'])) { header('Location: /fe/pages/login.php'); exit; }
+if (empty($_SESSION['user_id'])) { header('Location: login.php'); exit; }
 require_once __DIR__ . '/../../be/config/db.php';
 
 $code = trim($_GET['code'] ?? '');
-if (!$code) { header('Location: /fe/pages/home.php'); exit; }
+if (!$code) { header('Location: home.php'); exit; }
 
 $user_role = $_SESSION['user_role'] ?? 'user';
 
@@ -22,7 +22,7 @@ $bk = $pdo->prepare("
 ");
 $bk->execute([$code]);
 $booking = $bk->fetch();
-if (!$booking) { header('Location: /fe/pages/home.php'); exit; }
+if (!$booking) { header('Location: home.php'); exit; }
 
 // Authorization check: standard users can only view their own bookings.
 if ($user_role !== 'staff' && $user_role !== 'admin') {
@@ -92,7 +92,7 @@ $payLabels = ['momo'=>'MoMo','vnpay'=>'VNPay','zalopay'=>'ZaloPay','cash'=>'Ti�
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-:root{--blue:#2563EB;--bg:#F1F5F9;--card:#fff;--text:#0F172A;--muted:#64748B;--border:#E2E8F0;--green:#22C55E;--r:14px}
+:root{--blue:#DF1730;--bg:#F1F5F9;--card:#fff;--text:#0F172A;--muted:#64748B;--border:#E2E8F0;--green:#22C55E;--r:14px}
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
 .topbar{background:var(--card);border-bottom:1px solid var(--border);height:60px;display:flex;align-items:center;padding:0 24px;gap:16px;box-shadow:0 1px 8px rgba(15,23,42,.06)}
 .logo{display:flex;align-items:center;gap:9px;text-decoration:none}
@@ -122,7 +122,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .ticket{background:var(--card);border-radius:20px;box-shadow:0 4px 32px rgba(15,23,42,.10);overflow:hidden;margin-bottom:20px}
 .ticket-top{display:flex;gap:20px;padding:24px;border-bottom:2px dashed var(--border);position:relative}
 .ticket-poster{width:80px;height:112px;border-radius:10px;object-fit:cover;flex-shrink:0;background:#e2e8f0}
-.ticket-poster-ph{width:80px;height:112px;border-radius:10px;flex-shrink:0;background:linear-gradient(135deg,#334155,#1e293b);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.2);font-size:24px}
+.ticket-poster-ph{width:80px;height:112px;border-radius:10px;flex-shrink:0;background:#1e293b;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.2);font-size:24px}
 .ticket-info h2{font-size:18px;font-weight:800;margin-bottom:8px}
 .ticket-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px}
 .tm-item label{display:block;font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
@@ -132,7 +132,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .seats-info{flex:1}
 .seats-info label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px}
 .seats-row{display:flex;flex-wrap:wrap;gap:5px}
-.seat-chip{background:#EFF6FF;color:var(--blue);font-size:12px;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid #BFDBFE}
+.seat-chip{background:#FAF0F1;color:var(--blue);font-size:12px;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid #FCA5A5}
 .qr-box{width:100px;height:100px;border:3px solid var(--border);border-radius:12px;display:flex;align-items:center;justify-content:center;background:var(--bg);flex-shrink:0}
 .qr-box i{font-size:56px;color:var(--border)}
 
@@ -151,8 +151,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .btn-blue{background:var(--blue);color:#fff}
 .btn-blue:hover{background:#1D4ED8}
 .btn-outline{background:#fff;color:var(--blue);border:2px solid var(--blue)}
-.btn-outline:hover{background:#EFF6FF}
-.btn-print{background:linear-gradient(135deg,#7C3AED,#6D28D9);color:#fff}
+.btn-outline:hover{background:#FAF0F1}
+.btn-print{background:#1E1E24;color:#fff}
 .btn-print:hover{opacity:.9}
 
 /* INVOICE MODAL */
@@ -204,7 +204,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 </head>
 <body>
 <div class="topbar">
-  <a href="/fe/pages/home.php" class="logo"><div class="logo-icon"><i class="fa-solid fa-clapperboard"></i></div><span class="logo-name">MovieFlex</span></a>
+  <a href="home.php" class="logo"><div class="logo-icon"><i class="fa-solid fa-clapperboard"></i></div><span class="logo-name">MovieFlex</span></a>
   <div class="step-bar">
     <div class="step done"><div class="step-num"><i class="fa-solid fa-check" style="font-size:9px"></i></div> Chọn phim</div>
     <div class="step-line done"></div>
@@ -283,10 +283,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="actions">
       <button class="btn btn-print" onclick="document.getElementById('inv-overlay').classList.add('open')"><i class="fa-solid fa-file-invoice"></i> In hóa đơn</button>
       <?php if ($_SESSION['user_role'] === 'staff'): ?>
-        <a href="/fe/pages/staff.php" class="btn btn-blue"><i class="fa-solid fa-house"></i> Về ca trực nhân viên</a>
+        <a href="staff.php" class="btn btn-blue"><i class="fa-solid fa-house"></i> Về ca trực nhân viên</a>
       <?php else: ?>
-        <a href="/fe/pages/my-tickets.php" class="btn btn-outline"><i class="fa-solid fa-receipt"></i> Xem vé của tôi</a>
-        <a href="/fe/pages/home.php" class="btn btn-blue"><i class="fa-solid fa-house"></i> Về trang chủ</a>
+        <a href="my-tickets.php" class="btn btn-outline"><i class="fa-solid fa-receipt"></i> Xem vé của tôi</a>
+        <a href="home.php" class="btn btn-blue"><i class="fa-solid fa-house"></i> Về trang chủ</a>
       <?php endif; ?>
     </div>
 

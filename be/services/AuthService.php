@@ -127,7 +127,7 @@ class AuthService
 
         return [
             'success'  => true,
-            'redirect' => '/fe/pages/login.php',
+            'redirect' => $this->getRedirectUrl('/fe/pages/login.php'),
         ];
     }
 
@@ -238,11 +238,19 @@ class AuthService
 
     private function resolveRedirect(string $role): string
     {
-        return match ($role) {
+        $path = match ($role) {
             'admin', 'admin_monitor' => '/fe/admin/index.php',
             'staff'                  => '/fe/pages/staff.php',
             default                  => '/fe/pages/home.php',
         };
+        return $this->getRedirectUrl($path);
+    }
+
+    private function getRedirectUrl(string $path): string
+    {
+        $base = dirname(dirname($_SERVER['SCRIPT_NAME']));
+        $base = ($base === '/' || $base === '\\') ? '' : str_replace('\\', '/', $base);
+        return $base . $path;
     }
 
     private function assignWelcomeVouchers(int $userId): void

@@ -4,7 +4,7 @@ require_once __DIR__ . '/../../be/config/db.php';
 
 // Check staff authentication
 if (empty($_SESSION['user_id']) || ($_SESSION['user_role'] !== 'staff' && $_SESSION['user_role'] !== 'admin')) {
-  header('Location: /fe/pages/login.php');
+  header('Location: login.php');
   exit;
 }
 
@@ -27,8 +27,8 @@ $snacks = $pdo->query("SELECT * FROM snacks ORDER BY category, price")->fetchAll
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --blue:#4F46E5;
-  --blue-hover:#4338CA;
+  --blue:#DF1730;
+  --blue-hover:#C21025;
   --bg:#F8FAFC;
   --card:#ffffff;
   --text:#0F172A;
@@ -38,7 +38,7 @@ $snacks = $pdo->query("SELECT * FROM snacks ORDER BY category, price")->fetchAll
   --green:#10B981;
   --red:#EF4444;
   --orange:#F59E0B;
-  --shadow:0 4px 20px -2px rgba(79,70,229,0.08), 0 2px 8px -1px rgba(79,70,229,0.04);
+  --shadow:0 4px 20px -2px rgba(223,23,48,0.08), 0 2px 8px -1px rgba(223,23,48,0.04);
 }
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
 
@@ -47,7 +47,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .logo{display:flex;align-items:center;gap:9px;text-decoration:none}
 .logo-icon{width:32px;height:32px;background:var(--blue);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px}
 .logo-name{font-size:17px;font-weight:800;color:var(--blue)}
-.logo-badge{background:#EEF2FF;color:var(--blue);font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;border:1px solid #C7D2FE}
+.logo-badge{background:#FAF0F1;color:var(--blue);font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;border:1px solid #FCA5A5}
 .topbar-right{display:flex;align-items:center;gap:16px}
 .cinema-display{display:flex;align-items:center;gap:8px;background:#F1F5F9;border:1px solid var(--border);padding:6px 14px;border-radius:10px;font-size:13.5px;font-weight:600}
 .cinema-display i{color:var(--blue)}
@@ -64,7 +64,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .stat-card{background:var(--card);border-radius:var(--r);padding:20px;box-shadow:var(--shadow);border:1px solid var(--border);display:flex;align-items:center;gap:16px;transition:transform .2s}
 .stat-card:hover{transform:translateY(-2px)}
 .stat-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px}
-.stat-icon.blue{background:#EEF2FF;color:var(--blue)}
+.stat-icon.blue{background:#FAF0F1;color:var(--blue)}
 .stat-icon.green{background:#ECFDF5;color:var(--green)}
 .stat-icon.orange{background:#FFFBEB;color:var(--orange)}
 .stat-info{display:flex;flex-direction:column;gap:2px}
@@ -97,11 +97,11 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 /* Ticket Display Card */
 .ticket-detail{background:var(--card);border-radius:20px;box-shadow:var(--shadow);border:1px solid var(--border);overflow:hidden;display:none}
 .td-header{padding:20px 24px;border-bottom:1px dashed var(--border);position:relative;display:flex;gap:20px;align-items:center}
-.td-poster{width:64px;height:90px;border-radius:8px;object-fit:cover;background:#EFF6FF}
+.td-poster{width:64px;height:90px;border-radius:8px;object-fit:cover;background:#FAF0F1}
 .td-info h2{font-size:17px;font-weight:800;margin-bottom:6px}
 .td-badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;text-transform:uppercase}
 .td-badge.confirmed{background:#ECFDF5;color:var(--green)}
-.td-badge.checked_in{background:#EEF2FF;color:var(--blue)}
+.td-badge.checked_in{background:#FAF0F1;color:var(--blue)}
 .td-badge.cancelled{background:#FEF2F2;color:var(--red)}
 
 .td-body{padding:24px;display:grid;grid-template-columns:1fr 1fr;gap:14px 24px}
@@ -111,7 +111,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .td-field.full{grid-column:1/-1}
 
 .td-seats{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
-.td-seat-chip{background:#EFF6FF;color:var(--blue);font-size:12px;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid #C7D2FE}
+.td-seat-chip{background:#FAF0F1;color:var(--blue);font-size:12px;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid #FCA5A5}
 
 .td-warning{grid-column:1/-1;background:#FEF2F2;border:1px solid #FEE2E2;border-radius:10px;padding:12px 16px;color:#991B1B;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
 
@@ -140,7 +140,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .c-showtimes-list{display:flex;flex-wrap:wrap;gap:8px}
 .c-showtime-item{border:1.5px solid var(--border);border-radius:10px;padding:10px 16px;cursor:pointer;text-align:center;transition:all .2s}
 .c-showtime-item:hover{border-color:var(--blue);background:#F8FAFC}
-.c-showtime-item.selected{border-color:var(--blue);background:#EEF2FF;color:var(--blue)}
+.c-showtime-item.selected{border-color:var(--blue);background:#FAF0F1;color:var(--blue)}
 .c-showtime-time{font-size:15px;font-weight:800;display:block}
 .c-showtime-date{font-size:10px;color:var(--muted);font-weight:600}
 .c-showtime-hall{font-size:10px;font-weight:700;display:block;margin-top:2px}
@@ -169,7 +169,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 
 .sum-divider{height:1px;background:var(--border);margin:4px 0}
 .sum-chosen-seats{display:flex;flex-wrap:wrap;gap:4px}
-.sum-seat-tag{background:#EEF2FF;color:var(--blue);font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;border:1px solid #C7D2FE}
+.sum-seat-tag{background:#FAF0F1;color:var(--blue);font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;border:1px solid #FCA5A5}
 
 /* Member lookup */
 .member-lookup{display:flex;flex-direction:column;gap:6px}
@@ -194,7 +194,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .sum-payment label{font-size:12px;font-weight:700}
 .pay-options-row{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .pay-opt-btn{height:36px;border:1.5px solid var(--border);border-radius:8px;background:none;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px}
-.pay-opt-btn.selected{border-color:var(--blue);background:#EEF2FF;color:var(--blue)}
+.pay-opt-btn.selected{border-color:var(--blue);background:#FAF0F1;color:var(--blue)}
 
 .sum-total-row{display:flex;justify-content:space-between;align-items:center;font-size:15px;font-weight:800;margin-top:6px}
 .sum-total-price{color:var(--blue);font-size:20px}
@@ -211,7 +211,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .pos-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));gap:16px}
 .pos-card{border:1.5px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;gap:8px;position:relative}
 .pos-card:hover{border-color:var(--blue);transform:translateY(-2px)}
-.pos-card.in-cart{border-color:var(--blue);background:#EEF2FF}
+.pos-card.in-cart{border-color:var(--blue);background:#FAF0F1}
 .pos-name{font-size:13.5px;font-weight:700;line-height:1.4}
 .pos-category{font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted)}
 .pos-price-row{display:flex;justify-content:space-between;align-items:center;margin-top:auto}
@@ -224,13 +224,13 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.7);backdrop-filter:blur(4px);z-index:99999;display:none;align-items:center;justify-content:center;padding:16px}
 .modal-overlay.active{display:flex}
 .modal-card{background:var(--card);width:100%;max-width:540px;border-radius:20px;box-shadow:0 20px 48px -10px rgba(0,0,0,.3);overflow:hidden}
-.modal-head{background:linear-gradient(135deg,var(--blue),var(--blue-hover));padding:24px;text-align:center;color:#fff}
+.modal-head{background:var(--blue);padding:24px;text-align:center;color:#fff}
 .modal-head h2{font-size:19px;font-weight:800;margin-bottom:4px}
 .modal-head p{font-size:12.5px;opacity:.9}
 .modal-body{padding:24px;display:flex;flex-direction:column;gap:16px}
 .cinema-options-list{display:flex;flex-direction:column;gap:10px;max-height:300px;overflow-y:auto;padding-right:4px}
 .cinema-opt-card{border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:12px}
-.cinema-opt-card:hover{border-color:var(--blue);background:#EEF2FF}
+.cinema-opt-card:hover{border-color:var(--blue);background:#FAF0F1}
 .cinema-opt-icon{width:36px;height:36px;border-radius:8px;background:#F1F5F9;color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:16px}
 .cinema-opt-card:hover .cinema-opt-icon{background:#fff}
 .cinema-opt-info{flex:1}
@@ -280,7 +280,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 .mf-dialog-icon.danger  { background: #FEE2E2; color: #DC2626; }
 .mf-dialog-icon.warning { background: #FEF3C7; color: #D97706; }
-.mf-dialog-icon.info    { background: #EEF2FF; color: #4F46E5; }
+.mf-dialog-icon.info    { background: #FAF0F1; color: var(--blue); }
 .mf-dialog-icon.success { background: #D1FAE5; color: #059669; }
 .mf-dialog-body { padding: 20px 28px 24px; text-align: center; }
 .mf-dialog-title { font-size: 17px; font-weight: 800; color: #0F172A; margin-bottom: 8px; line-height: 1.3; }
@@ -305,7 +305,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .mf-btn-confirm:hover { opacity: .88; }
 .mf-btn-confirm.danger  { background: #EF4444; }
 .mf-btn-confirm.warning { background: #F59E0B; }
-.mf-btn-confirm.info    { background: #4F46E5; }
+.mf-btn-confirm.info    { background: var(--blue); }
 .mf-btn-confirm.success { background: #10B981; }
 </style>
 
@@ -625,7 +625,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 <!-- Invoice Preview Modal Overlay -->
 <div class="modal-overlay" id="invoicePreviewModal">
   <div class="modal-card" style="max-width: 500px;">
-    <div class="modal-head" style="background: linear-gradient(135deg, var(--blue), var(--blue-hover));">
+    <div class="modal-head" style="background: var(--blue);">
       <h2><i class="fa-solid fa-file-invoice-dollar"></i> XÁC NHẬN HÓA ĐƠN</h2>
       <p>Kiểm tra kỹ các sản phẩm trước khi thanh toán & in</p>
     </div>
@@ -1047,7 +1047,7 @@ async function searchTicket() {
   activeTicketObj = null;
 
   try {
-    const res = await fetch(`api-staff.php?action=check_ticket&code=${encodeURIComponent(code)}`);
+    const res = await fetch(`../../be/controllers/StaffController.php?action=check_ticket&code=${encodeURIComponent(code)}`);
     const json = await res.json();
 
     if (json.success) {
@@ -1105,7 +1105,7 @@ async function searchTicket() {
       } else if (ticket.status === 'checked_in') {
         const printBtn = document.createElement('button');
         printBtn.className = 'btn-print-checkin-ticket';
-        printBtn.style.cssText = 'width:100%; height:46px; background:linear-gradient(135deg, #10B981, #059669); color:#fff; border:none; border-radius:10px; font-size:14.5px; font-weight:700; cursor:pointer; font-family:inherit; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 12px rgba(16, 185, 129, 0.25); transition: opacity .15s;';
+        printBtn.style.cssText = 'width:100%; height:46px; background:#10B981; color:#fff; border:none; border-radius:10px; font-size:14.5px; font-weight:700; cursor:pointer; font-family:inherit; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 12px rgba(16, 185, 129, 0.25); transition: opacity .15s;';
         printBtn.innerHTML = '<i class="fa-solid fa-print"></i> In vé xem phim cho khách';
         printBtn.onclick = printCheckinTicket;
         actionsRow.appendChild(printBtn);
@@ -1134,7 +1134,7 @@ async function confirmCheckin() {
   }
 
   try {
-    const res = await fetch('api-staff.php?action=do_checkin', {
+    const res = await fetch('../../be/controllers/StaffController.php?action=do_checkin', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({code: activeTicketCode})
@@ -1167,7 +1167,7 @@ async function loadCounterMovies() {
   list.innerHTML = '<div style="color:var(--muted); padding:20px 0; grid-column:1/-1; text-align:center">Đang tải phim chi nhánh...</div>';
 
   try {
-    const res = await fetch('api-staff.php?action=get_counter_movies');
+    const res = await fetch('../../be/controllers/StaffController.php?action=get_counter_movies');
     const json = await res.json();
 
     if (json.success) {
@@ -1216,7 +1216,7 @@ async function selectCounterMovie(id, title) {
   document.getElementById('c-step-2').style.display = 'block';
 
   try {
-    const res = await fetch(`api-staff.php?action=get_movie_showtimes&movie_id=${id}`);
+    const res = await fetch(`../../be/controllers/StaffController.php?action=get_movie_showtimes&movie_id=${id}`);
     const json = await res.json();
 
     if (json.success) {
@@ -1261,7 +1261,7 @@ async function selectCounterShowtime(id, date, start_time, hall_name) {
   document.getElementById('c-step-3').style.display = 'block';
 
   try {
-    const res = await fetch(`api-staff.php?action=get_showtime_seats&showtime_id=${id}`);
+    const res = await fetch(`../../be/controllers/StaffController.php?action=get_showtime_seats&showtime_id=${id}`);
     const json = await res.json();
 
     if (json.success) {
@@ -1421,7 +1421,7 @@ async function searchMember() {
   }
 
   try {
-    const res = await fetch(`api-staff.php?action=search_customer&query=${encodeURIComponent(val)}`);
+    const res = await fetch(`../../be/controllers/StaffController.php?action=search_customer&query=${encodeURIComponent(val)}`);
     const json = await res.json();
 
     if (json.success) {
@@ -1468,7 +1468,7 @@ async function submitCounterBooking() {
   };
 
   try {
-    const res = await fetch('api-staff.php?action=create_counter_booking', {
+    const res = await fetch('../../be/controllers/StaffController.php?action=create_counter_booking', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(payload)
@@ -1478,7 +1478,7 @@ async function submitCounterBooking() {
     if (json.success) {
       showToast('Lập đơn thành công', `Đơn hàng ${json.booking_code} đã thanh toán thành công!`);
       setTimeout(() => {
-        window.location.href = `/fe/pages/booking-confirm.php?code=${json.booking_code}`;
+        window.location.href = `booking-confirm.php?code=${json.booking_code}`;
       }, 1500);
     } else {
       showToast('Lập đơn thất bại', json.message, 'error');
@@ -1606,7 +1606,7 @@ async function searchPosMember() {
   }
 
   try {
-    const res = await fetch(`api-staff.php?action=search_customer&query=${encodeURIComponent(val)}`);
+    const res = await fetch(`../../be/controllers/StaffController.php?action=search_customer&query=${encodeURIComponent(val)}`);
     const json = await res.json();
 
     if (json.success) {
@@ -1642,13 +1642,13 @@ async function submitPosSnackOrder() {
   // Let's find any showtime in this cinema to hook it up.
   try {
     // 1. Fetch cinema active showtimes to get a valid showtime_id
-    const showRes = await fetch('api-staff.php?action=get_counter_movies');
+    const showRes = await fetch('../../be/controllers/StaffController.php?action=get_counter_movies');
     const showJson = await showRes.json();
     let showtime_id = 0;
     
     if (showJson.success && showJson.data.length > 0) {
       // Find showtimes for first movie
-      const stRes = await fetch(`api-staff.php?action=get_movie_showtimes&movie_id=${showJson.data[0].id}`);
+      const stRes = await fetch(`../../be/controllers/StaffController.php?action=get_movie_showtimes&movie_id=${showJson.data[0].id}`);
       const stJson = await stRes.json();
       if (stJson.success && stJson.data.length > 0) {
         showtime_id = stJson.data[0].id;
@@ -1670,7 +1670,7 @@ async function submitPosSnackOrder() {
       snacks: snacksArr
     };
 
-    const res = await fetch('api-staff.php?action=create_counter_booking', {
+    const res = await fetch('../../be/controllers/StaffController.php?action=create_counter_booking', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(payload)
@@ -1720,10 +1720,10 @@ async function doLogout() {
   const fd = new FormData();
   fd.append('action', 'logout');
   try {
-    const res = await fetch('../../be/controllers/AuthController.php', {method: 'POST', body: fd});
+    const res = await fetch('../../be/api.php', {method: 'POST', body: fd});
     const json = await res.json();
-    window.location.href = json.redirect || '/fe/pages/login.php';
-  } catch(e) { window.location.href = '/fe/pages/login.php'; }
+    window.location.href = json.redirect || 'login.php';
+  } catch(e) { window.location.href = 'login.php'; }
 }
 
 </script>

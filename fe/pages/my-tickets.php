@@ -1,6 +1,6 @@
 <?php
 session_start();
-if (empty($_SESSION['user_id'])) { header('Location: /fe/pages/login.php'); exit; }
+if (empty($_SESSION['user_id'])) { header('Location: login.php'); exit; }
 require_once __DIR__ . '/../../be/config/db.php';
 require_once __DIR__ . '/../../be/services/UserService.php';
 
@@ -32,7 +32,7 @@ function javascript_escape($str) {
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-:root{--blue:#2563EB;--sb:#0F172A;--sbw:240px;--bg:#F1F5F9;--card:#fff;--text:#0F172A;--muted:#64748B;--border:#E2E8F0;--r:14px;--sh:0 2px 16px rgba(15,23,42,.07)}
+:root{--blue:#DF1730;--sb:#0F172A;--sbw:240px;--bg:#F1F5F9;--card:#fff;--text:#0F172A;--muted:#64748B;--border:#E2E8F0;--r:14px;--sh:0 2px 16px rgba(15,23,42,.07)}
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
 
 .main{margin-left:var(--sbw);flex:1}
@@ -49,7 +49,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 .bk-card:hover{box-shadow:0 4px 28px rgba(15,23,42,.12)}
 .bk-top{display:flex;gap:16px;padding:18px 20px;border-bottom:1px dashed var(--border)}
 .bk-poster{width:64px;height:90px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#e2e8f0}
-.bk-poster-ph{width:64px;height:90px;border-radius:8px;flex-shrink:0;background:linear-gradient(135deg,#334155,#1e293b);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.2);font-size:22px}
+.bk-poster-ph{width:64px;height:90px;border-radius:8px;flex-shrink:0;background:#1e293b;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.2);font-size:22px}
 .bk-info{flex:1}
 .bk-title{font-size:15px;font-weight:700;margin-bottom:6px}
 .bk-meta{font-size:13px;color:var(--muted);line-height:1.7}
@@ -58,7 +58,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 .bk-code{font-size:13px;font-weight:700;color:var(--muted)}
 .bk-bot{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--bg)}
 .seats-row{display:flex;flex-wrap:wrap;gap:5px}
-.seat-chip{background:#EFF6FF;color:var(--blue);font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:5px;border:1px solid #BFDBFE}
+.seat-chip{background:#FAF0F1;color:var(--blue);font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:5px;border:1px solid #FCA5A5}
 .bk-actions{display:flex;gap:8px}
 .btn-sm{height:34px;padding:0 14px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;border:none;font-family:inherit;display:flex;align-items:center;gap:5px;text-decoration:none;transition:all .2s}
 .btn-sm-blue{background:var(--blue);color:#fff}
@@ -112,7 +112,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
       <i class="fa-solid fa-ticket"></i>
       <h3>Chưa có vé nào</h3>
       <p><?= $tab==='upcoming' ? 'Bạn chưa có vé sắp chiếu. Hãy đặt vé ngay!' : ($tab==='past' ? 'Bạn chưa có vé đã chiếu.' : 'Bạn chưa có vé đã hủy.') ?></p>
-      <a href="/fe/pages/home.php" style="display:inline-flex;align-items:center;gap:7px;margin-top:16px;padding:10px 22px;background:var(--blue);color:#fff;border-radius:10px;font-weight:700;text-decoration:none"><i class="fa-solid fa-film"></i> Xem phim ngay</a>
+      <a href="home.php" style="display:inline-flex;align-items:center;gap:7px;margin-top:16px;padding:10px 22px;background:var(--blue);color:#fff;border-radius:10px;font-weight:700;text-decoration:none"><i class="fa-solid fa-film"></i> Xem phim ngay</a>
     </div>
     <?php else: ?>
     <div class="ticket-list">
@@ -262,7 +262,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 </div>
 
 <script>
-const USER_ENDPOINT = '/be/controllers/UserController.php';
+const USER_ENDPOINT = '../../be/api.php';
 
 function showAlert(type, message) {
   const box = document.getElementById('alert-box');
@@ -372,8 +372,8 @@ document.getElementById('review-form').addEventListener('submit', async function
 
 async function logout(){
   const fd=new FormData();fd.append('action','logout');
-  const r=await fetch('../../be/controllers/AuthController.php',{method:'POST',body:fd});
-  const d=await r.json();location.href=d.redirect||'/fe/pages/login.php';
+  const r=await fetch('../../be/api.php',{method:'POST',body:fd});
+  const d=await r.json();location.href=d.redirect||'login.php';
 }
 
 // Realtime: Ẩn nút hủy vé khi < 60 phút trước giờ chiếu
