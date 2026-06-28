@@ -5,106 +5,6 @@ if (empty($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
     header('Location: ../pages/login.php');
     exit;
 }
-
-require_once __DIR__ . '/../../be/config/db.php';
-
-$message = '';
-$messageType = '';
-
-// Handle CRUD operations
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
-
-    if ($action === 'save') {
-        $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
-        $title = trim($_POST['title'] ?? '');
-        $description = trim($_POST['description'] ?? '');
-        $genre = trim($_POST['genre'] ?? '');
-        $duration_min = (int)($_POST['duration_min'] ?? 120);
-        $release_date = $_POST['release_date'] ?? null;
-        $rating = (float)($_POST['rating'] ?? 8.0);
-        $poster_url = trim($_POST['poster_url'] ?? '');
-        $backdrop_url = trim($_POST['backdrop_url'] ?? '');
-        $trailer_url = trim($_POST['trailer_url'] ?? '');
-        $director = trim($_POST['director'] ?? '');
-        $cast_list = trim($_POST['cast_list'] ?? '');
-        $age_rating = trim($_POST['age_rating'] ?? 'P');
-        $status = $_POST['status'] ?? 'now_showing';
-
-        if ($title) {
-            $today = date('Y-m-d');
-            if ($status === 'now_showing' && $release_date && $release_date > $today) {
-                $message = "Lỗi logic: Phim có ngày khởi chiếu trong tương lai (" . date('d/m/Y', strtotime($release_date)) . ") không thể đặt trạng thái là <b>Đang chiếu</b>. Vui lòng chỉnh sửa ngày khởi chiếu hoặc chọn trạng thái 'Sắp chiếu'.";
-                $messageType = 'error';
-            } else {
-                try {
-                    if ($id > 0) {
-                        // Update
-                        $stmt = $pdo->prepare("UPDATE movies SET title=?, description=?, genre=?, duration_min=?, release_date=?, rating=?, poster_url=?, backdrop_url=?, trailer_url=?, director=?, cast_list=?, age_rating=?, status=? WHERE id=?");
-                        $stmt->execute([$title, $description ?: null, $genre ?: null, $duration_min, $release_date ?: null, $rating, $poster_url ?: null, $backdrop_url ?: null, $trailer_url ?: null, $director ?: null, $cast_list ?: null, $age_rating, $status, $id]);
-                        
-                        // Log
-                        $logDesc = "Đã cập nhật thông tin phim: \"$title\"";
-                        $pdo->prepare("INSERT INTO system_logs (log_time, user_name, role, action_type, action_desc) VALUES (NOW(), ?, 'admin', 'Cập nhật phim', ?)")
-                            ->execute([$_SESSION['user_name'], $logDesc]);
-
-                        $message = "Đã cập nhật phim <b>" . htmlspecialchars($title) . "</b> thành công!";
-                    } else {
-                        // Create
-                        $stmt = $pdo->prepare("INSERT INTO movies (title, description, genre, duration_min, release_date, rating, poster_url, backdrop_url, trailer_url, director, cast_list, age_rating, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                        $stmt->execute([$title, $description ?: null, $genre ?: null, $duration_min, $release_date ?: null, $rating, $poster_url ?: null, $backdrop_url ?: null, $trailer_url ?: null, $director ?: null, $cast_list ?: null, $age_rating, $status]);
-                        
-                        // Log
-                        $logDesc = "Đã thêm phim mới: \"$title\"";
-                        $pdo->prepare("INSERT INTO system_logs (log_time, user_name, role, action_type, action_desc) VALUES (NOW(), ?, 'admin', 'Thêm phim mới', ?)")
-                            ->execute([$_SESSION['user_name'], $logDesc]);
-
-                        $message = "Đã thêm phim mới <b>" . htmlspecialchars($title) . "</b> thành công!";
-                    }
-                    $messageType = 'success';
-                } catch (Exception $e) {
-                    $message = "Lỗi hệ thống: " . $e->getMessage();
-                    $messageType = 'error';
-                }
-            }
-        } else {
-            $message = "Vui lòng điền tiêu đề phim.";
-            $messageType = 'error';
-        }
-    } elseif ($action === 'delete') {
-        $id = (int)($_POST['id'] ?? 0);
-        if ($id > 0) {
-            try {
-                // Get movie title first for logging
-                $mStmt = $pdo->prepare("SELECT title FROM movies WHERE id = ?");
-                $mStmt->execute([$id]);
-                $title = $mStmt->fetchColumn();
-
-                $stmt = $pdo->prepare("DELETE FROM movies WHERE id = ?");
-                $stmt->execute([$id]);
-                
-                // Log
-                $logDesc = "Đã xóa phim: \"$title\"";
-                $pdo->prepare("INSERT INTO system_logs (log_time, user_name, role, action_type, action_desc) VALUES (NOW(), ?, 'admin', 'Xóa phim', ?)")
-                    ->execute([$_SESSION['user_name'], $logDesc]);
-
-                $message = "Đã xóa phim thành công!";
-                $messageType = 'success';
-            } catch (Exception $e) {
-                $message = "Không thể xóa phim này do đã có Suất chiếu được xếp lịch.";
-                $messageType = 'error';
-            }
-        }
-    }
-}
-
-// Fetch stats
-$total_movies = $pdo->query("SELECT COUNT(*) FROM movies")->fetchColumn();
-$now_showing = $pdo->query("SELECT COUNT(*) FROM movies WHERE status = 'now_showing'")->fetchColumn();
-$coming_soon = $pdo->query("SELECT COUNT(*) FROM movies WHERE status = 'coming_soon'")->fetchColumn();
-
-// Fetch movie list
-$movies = $pdo->query("SELECT * FROM movies ORDER BY id DESC")->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -112,7 +12,7 @@ $movies = $pdo->query("SELECT * FROM movies ORDER BY id DESC")->fetchAll();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MovieFlex Admin - Quản lý Phim</title>
-    <link rel="stylesheet" href="/fe/assets/css/styles.css">
+    <link rel="stylesheet" href="../assets/css/styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -256,29 +156,21 @@ $movies = $pdo->query("SELECT * FROM movies ORDER BY id DESC")->fetchAll();
                     </div>
                 </div>
 
-                <!-- Alert Message -->
-                <?php if ($message): ?>
-                <div class="alert-bar <?= $messageType ?>">
-                    <i class="fa-solid <?= $messageType === 'success' ? 'fa-circle-check' : 'fa-triangle-exclamation' ?>"></i>
-                    <span><?= $message ?></span>
-                </div>
-                <?php endif; ?>
-
                 <!-- Stats Cards -->
                 <div class="stat-cards-bottom" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-bottom: 24px; margin-top: 0;">
                     <div class="kpi-card" style="padding: 16px 20px;">
                         <span class="kpi-label">TỔNG SỐ PHIM</span>
-                        <h3 class="kpi-value" style="font-size: 24px; margin-bottom:4px;"><?= $total_movies ?></h3>
+                        <h3 class="kpi-value" id="stat-total" style="font-size: 24px; margin-bottom:4px;">...</h3>
                         <span style="font-size:12px; color:var(--text-muted);">Đã đăng ký hệ thống</span>
                     </div>
                     <div class="kpi-card" style="padding: 16px 20px;">
                         <span class="kpi-label" style="color:var(--success-text);">ĐANG TRÌNH CHIẾU</span>
-                        <h3 class="kpi-value" style="font-size: 24px; margin-bottom:4px; color:var(--success-text);"><?= $now_showing ?></h3>
+                        <h3 class="kpi-value" id="stat-showing" style="font-size: 24px; margin-bottom:4px; color:var(--success-text);">...</h3>
                         <span style="font-size:12px; color:var(--success-text);"><i class="fa-solid fa-circle active-dot" style="background:var(--success-text); margin-right:4px;"></i> Đang phục vụ suất chiếu</span>
                     </div>
                     <div class="kpi-card" style="padding: 16px 20px;">
                         <span class="kpi-label" style="color:#00897B;">SẮP TRÌNH CHIẾU</span>
-                        <h3 class="kpi-value" style="font-size: 24px; margin-bottom:4px; color:#00897B;"><?= $coming_soon ?></h3>
+                        <h3 class="kpi-value" id="stat-coming" style="font-size: 24px; margin-bottom:4px; color:#00897B;">...</h3>
                         <span style="font-size:12px; color:#00897B;">Phim đã lên lịch ra mắt</span>
                     </div>
                 </div>
@@ -328,49 +220,9 @@ $movies = $pdo->query("SELECT * FROM movies ORDER BY id DESC")->fetchAll();
                             </tr>
                         </thead>
                         <tbody id="moviesBody">
-                            <?php if (empty($movies)): ?>
-                            <tr><td colspan="9" class="text-center" style="padding: 40px; color: var(--text-muted);">Không tìm thấy bộ phim nào trong hệ thống.</td></tr>
-                            <?php else: ?>
-                            <?php foreach ($movies as $m): 
-                                $status_class = $m['status'];
-                                $status_text = 'Đang chiếu';
-                                if ($m['status'] === 'coming_soon') $status_text = 'Sắp chiếu';
-                                if ($m['status'] === 'ended') $status_text = 'Đã kết thúc';
-                            ?>
-                            <tr data-status="<?= $m['status'] ?>" data-age="<?= htmlspecialchars($m['age_rating']) ?>">
-                                <td>
-                                    <?php if ($m['poster_url']): ?>
-                                        <img src="<?= htmlspecialchars($m['poster_url']) ?>" alt="Poster" class="movie-thumb">
-                                    <?php else: ?>
-                                        <div class="movie-thumb" style="display:flex;align-items:center;justify-content:center;color:#adb5bd;font-size:20px;"><i class="fa-solid fa-film"></i></div>
-                                    <?php endif; ?>
-                                </td>
-                                <td>
-                                    <strong style="color: #111; font-size:14.5px;"><?= htmlspecialchars($m['title']) ?></strong>
-                                    <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">⭐ <?= number_format($m['rating'], 1) ?>/10</div>
-                                </td>
-                                <td><?= htmlspecialchars($m['genre'] ?? '—') ?></td>
-                                <td class="text-center"><strong><?= $m['duration_min'] ?></strong> phút</td>
-                                <td><?= htmlspecialchars($m['director'] ?? '—') ?></td>
-                                <td><?= $m['release_date'] ? date('d/m/Y', strtotime($m['release_date'])) : '—' ?></td>
-                                <td class="text-center"><strong style="color:#d9480f;"><?= htmlspecialchars($m['age_rating']) ?></strong></td>
-                                <td><span class="badge-status <?= $status_class ?>"><?= $status_text ?></span></td>
-                                <td>
-                                    <div class="action-btns">
-                                        <button class="action-btn edit" title="Chỉnh sửa" onclick='openEditModal(<?= json_encode($m) ?>)'><i class="fa-solid fa-pen-to-square"></i></button>
-                                        
-                                        <form method="POST" id="delete-movie-form-<?= $m['id'] ?>" style="display:none;">
-                                            <input type="hidden" name="action" value="delete">
-                                            <input type="hidden" name="id" value="<?= $m['id'] ?>">
-                                        </form>
-                                        <button type="button" class="action-btn delete" title="Xóa" onclick="confirmDeleteMovie(<?= $m['id'] ?>, '<?= htmlspecialchars(addslashes($m['title'])) ?>')">
-                                            <i class="fa-solid fa-trash-can"></i>
-                                        </button>
-                                    </div>
-                                </td>
+                            <tr>
+                                <td colspan="9" class="text-center" style="padding: 40px; color: var(--text-muted);">Đang tải danh sách phim...</td>
                             </tr>
-                            <?php endforeach; ?>
-                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
@@ -389,7 +241,7 @@ $movies = $pdo->query("SELECT * FROM movies ORDER BY id DESC")->fetchAll();
                 <button class="close-modal" onclick="closeModal()" style="border:none; background:none; font-size:20px; cursor:pointer; color:var(--text-muted);"><i class="fa-solid fa-xmark"></i></button>
             </div>
             
-            <form method="POST" onsubmit="return validateMovieForm(this);">
+            <form id="movieForm">
                 <input type="hidden" name="action" value="save">
                 <input type="hidden" name="id" id="form-id" value="0">
                 
@@ -478,6 +330,233 @@ $movies = $pdo->query("SELECT * FROM movies ORDER BY id DESC")->fetchAll();
     </div>
 
     <script>
+        let allMovies = [];
+        let filteredMovies = [];
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.toString()
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function escapeJs(text) {
+            if (!text) return '';
+            return text.toString().replace(/'/g, "\\'").replace(/"/g, '\\"');
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '—';
+            const parts = dateStr.split('-');
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+
+        async function fetchStats() {
+            try {
+                const res = await fetch('../../be/controllers/admin/AdminMovieController.php?action=stats');
+                const json = await res.json();
+                
+                if (json.success) {
+                    document.getElementById('stat-total').textContent = json.stats.total_movies;
+                    document.getElementById('stat-showing').textContent = json.stats.now_showing;
+                    document.getElementById('stat-coming').textContent = json.stats.coming_soon;
+                }
+            } catch (e) {
+                console.error('Error fetching movie stats:', e);
+            }
+        }
+
+        async function fetchMovies() {
+            try {
+                const res = await fetch('../../be/controllers/admin/AdminMovieController.php?action=list');
+                const json = await res.json();
+                
+                if (json.success) {
+                    allMovies = json.data || [];
+                    filterTable();
+                } else {
+                    mfToast('Lỗi tải danh sách', json.message || 'Không thể tải danh sách phim.', 'danger');
+                }
+            } catch (e) {
+                console.error('Error fetching movies:', e);
+                mfToast('Lỗi hệ thống', 'Không thể kết nối máy chủ để tải thông tin phim.', 'warning');
+            }
+        }
+
+        function filterTable() {
+            const query = document.getElementById('search-input').value.toLowerCase().trim();
+            const statusFilter = document.getElementById('filter-status').value;
+            const ageFilter = document.getElementById('filter-age').value;
+
+            filteredMovies = allMovies.filter(m => {
+                const title = (m.title || '').toLowerCase();
+                const genre = (m.genre || '').toLowerCase();
+                const director = (m.director || '').toLowerCase();
+                
+                const matchesQuery = !query || title.includes(query) || genre.includes(query) || director.includes(query);
+                const matchesStatus = !statusFilter || m.status === statusFilter;
+                const matchesAge = !ageFilter || m.age_rating === ageFilter;
+
+                return matchesQuery && matchesStatus && matchesAge;
+            });
+
+            renderMoviesTable();
+        }
+
+        function renderMoviesTable() {
+            const tbody = document.getElementById('moviesBody');
+            tbody.innerHTML = '';
+
+            if (filteredMovies.length === 0) {
+                tbody.innerHTML = `
+                    <tr id="filter-empty-row">
+                        <td colspan="9" style="text-align:center; padding: 48px 20px;">
+                            <div style="display:flex; flex-direction:column; align-items:center; gap:12px; color:var(--text-muted);">
+                                <div style="width:56px;height:56px;border-radius:16px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;font-size:22px;">
+                                    <i class="fa-solid fa-film-slash" style="opacity:.4;"></i>
+                                </div>
+                                <div>
+                                    <div style="font-size:15px;font-weight:700;color:var(--text-main);margin-bottom:4px;">Không tìm thấy phim nào</div>
+                                    <div style="font-size:13px;">Thử thay đổi từ khoá hoặc bộ lọc để xem kết quả khác.</div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>`;
+                return;
+            }
+
+            let html = '';
+            filteredMovies.forEach(m => {
+                const status_class = m.status;
+                let status_text = 'Đang chiếu';
+                if (m.status === 'coming_soon') status_text = 'Sắp chiếu';
+                if (m.status === 'ended') status_text = 'Đã kết thúc';
+
+                const posterHtml = m.poster_url
+                    ? `<img src="${escapeHtml(m.poster_url)}" alt="Poster" class="movie-thumb">`
+                    : `<div class="movie-thumb" style="display:flex;align-items:center;justify-content:center;color:#adb5bd;font-size:20px;"><i class="fa-solid fa-film"></i></div>`;
+
+                html += `
+                    <tr data-status="${m.status}" data-age="${escapeHtml(m.age_rating)}">
+                        <td>${posterHtml}</td>
+                        <td>
+                            <strong style="color: #111; font-size:14.5px;">${escapeHtml(m.title)}</strong>
+                            <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">⭐ ${parseFloat(m.rating).toFixed(1)}/10</div>
+                        </td>
+                        <td>${escapeHtml(m.genre || '—')}</td>
+                        <td class="text-center"><strong>${m.duration_min}</strong> phút</td>
+                        <td>${escapeHtml(m.director || '—')}</td>
+                        <td>${formatDate(m.release_date)}</td>
+                        <td class="text-center"><strong style="color:#d9480f;">${escapeHtml(m.age_rating)}</strong></td>
+                        <td><span class="badge-status ${status_class}">${status_text}</span></td>
+                        <td>
+                            <div class="action-btns">
+                                <button type="button" class="action-btn edit" title="Chỉnh sửa" onclick="openEditModal(${m.id})"><i class="fa-solid fa-pen-to-square"></i></button>
+                                <button type="button" class="action-btn delete" title="Xóa" onclick="confirmDeleteMovie(${m.id}, '${escapeJs(m.title)}')">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>`;
+            });
+            tbody.innerHTML = html;
+        }
+
+        async function confirmDeleteMovie(id, title) {
+            const ok = await mfConfirm({
+                title: 'Xóa bộ phim',
+                desc: `Bạn có chắc chắn muốn xóa phim <strong>${title}</strong>?<br><br>⚠️ Hành động sẽ thất bại nếu phim này đang có suất chiếu được xếp lịch trong hệ thống.`,
+                type: 'danger',
+                confirmText: 'Xóa phim',
+                confirmIcon: 'fa-trash-can',
+                cancelText: 'Giữ lại'
+            });
+            if (ok) {
+                try {
+                    const formData = new FormData();
+                    formData.append('action', 'delete');
+                    formData.append('id', id);
+
+                    const res = await fetch('../../be/controllers/admin/AdminMovieController.php?action=delete', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const json = await res.json();
+                    
+                    if (json.success) {
+                        mfToast('Thành công', json.message || 'Đã xóa phim thành công!', 'success');
+                        await fetchMovies();
+                        await fetchStats();
+                    } else {
+                        mfToast('Lỗi khi xóa', json.message || 'Đã xảy ra lỗi khi xóa phim.', 'danger', 7000);
+                    }
+                } catch (e) {
+                    console.error('Error deleting movie:', e);
+                    mfToast('Lỗi hệ thống', 'Không thể kết nối máy chủ để xóa phim. Vui lòng thử lại.', 'warning');
+                }
+            }
+        }
+
+        document.getElementById('movieForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            // Client-side Validation: Release Date vs Status
+            const status = document.getElementById('form-status').value;
+            const releaseDateVal = document.getElementById('form-release').value;
+            
+            if (status === 'now_showing' && releaseDateVal) {
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = String(today.getMonth() + 1).padStart(2, '0');
+                const day = String(today.getDate()).padStart(2, '0');
+                const todayStr = `${year}-${month}-${day}`;
+                
+                if (releaseDateVal > todayStr) {
+                    mfToast(
+                        'Lỗi logic ngày khởi chiếu',
+                        `Phim có ngày khởi chiếu ${formatDate(releaseDateVal)} nằm trong tương lai, không thể đặt trạng thái "Đang chiếu". Hãy đổi trạng thái thành "Sắp chiếu".`,
+                        'warning', 6000
+                    );
+                    document.getElementById('form-release').focus();
+                    return;
+                }
+            }
+
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalBtnHTML = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu phim...';
+
+            try {
+                const formData = new FormData(this);
+                formData.set('action', 'save');
+
+                const res = await fetch('../../be/controllers/admin/AdminMovieController.php?action=save', {
+                    method: 'POST',
+                    body: formData
+                });
+                const json = await res.json();
+                
+                if (json.success) {
+                    mfToast('Thành công', json.message || 'Đã lưu thông tin phim thành công!', 'success');
+                    closeModal();
+                    await fetchMovies();
+                    await fetchStats();
+                } else {
+                    mfToast('Lỗi lưu phim', json.message || 'Đã xảy ra lỗi khi lưu phim.', 'danger', 7000);
+                }
+            } catch (err) {
+                console.error('Lỗi khi lưu phim:', err);
+                mfToast('Lỗi hệ thống', 'Không thể kết nối máy chủ để lưu phim. Vui lòng thử lại.', 'warning');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHTML;
+            }
+        });
+
         function openAddModal() {
             document.getElementById('modal-title-text').textContent = 'Thêm Phim mới';
             document.getElementById('form-id').value = '0';
@@ -498,7 +577,10 @@ $movies = $pdo->query("SELECT * FROM movies ORDER BY id DESC")->fetchAll();
             document.getElementById('movieModal').classList.add('active');
         }
 
-        function openEditModal(m) {
+        function openEditModal(id) {
+            const m = allMovies.find(item => item.id == id);
+            if (!m) return;
+
             document.getElementById('modal-title-text').textContent = 'Chỉnh sửa Phim #' + m.id;
             document.getElementById('form-id').value = m.id;
             document.getElementById('form-title').value = m.title;
@@ -522,107 +604,10 @@ $movies = $pdo->query("SELECT * FROM movies ORDER BY id DESC")->fetchAll();
             document.getElementById('movieModal').classList.remove('active');
         }
 
-        function filterTable() {
-            const query = document.getElementById('search-input').value.toLowerCase().trim();
-            const statusFilter = document.getElementById('filter-status').value;
-            const ageFilter = document.getElementById('filter-age').value;
-            
-            const tbody = document.getElementById('moviesBody');
-            const rows = tbody.querySelectorAll('tr[data-status]');
-            
-            // Remove existing empty-state row if any
-            const existingEmpty = document.getElementById('filter-empty-row');
-            if (existingEmpty) existingEmpty.remove();
-            
-            let visibleCount = 0;
-            rows.forEach(row => {
-                const titleEl = row.cells[1]?.querySelector('strong');
-                if (!titleEl) return;
-                
-                const title = titleEl.textContent.toLowerCase();
-                const genre = row.cells[2]?.textContent.toLowerCase() ?? '';
-                const director = row.cells[4]?.textContent.toLowerCase() ?? '';
-                const status = row.dataset.status;
-                const age = row.dataset.age;
-                
-                const matchesQuery = !query || title.includes(query) || genre.includes(query) || director.includes(query);
-                const matchesStatus = !statusFilter || status === statusFilter;
-                const matchesAge = !ageFilter || age === ageFilter;
-
-                if (matchesQuery && matchesStatus && matchesAge) {
-                    row.style.display = '';
-                    visibleCount++;
-                } else {
-                    row.style.display = 'none';
-                }
-            });
-
-            // Show empty state row if nothing matches
-            if (visibleCount === 0 && rows.length > 0) {
-                const emptyRow = document.createElement('tr');
-                emptyRow.id = 'filter-empty-row';
-                emptyRow.innerHTML = `
-                    <td colspan="9" style="text-align:center; padding: 48px 20px;">
-                        <div style="display:flex; flex-direction:column; align-items:center; gap:12px; color:var(--text-muted);">
-                            <div style="width:56px;height:56px;border-radius:16px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;font-size:22px;">
-                                <i class="fa-solid fa-film-slash" style="opacity:.4;"></i>
-                            </div>
-                            <div>
-                                <div style="font-size:15px;font-weight:700;color:var(--text-main);margin-bottom:4px;">Không tìm thấy phim nào</div>
-                                <div style="font-size:13px;">Thử thay đổi từ khoá hoặc bộ lọc để xem kết quả khác.</div>
-                            </div>
-                        </div>
-                    </td>`;
-                tbody.appendChild(emptyRow);
-            }
-        }
-
-
-        async function confirmDeleteMovie(id, title) {
-            const ok = await mfConfirm({
-                title: 'Xóa bộ phim',
-                desc: `Bạn có chắc chắn muốn xóa phim <strong>${title}</strong>?<br><br>⚠️ Hành động sẽ thất bại nếu phim này đang có suất chiếu được xếp lịch trong hệ thống.`,
-                type: 'danger',
-                confirmText: 'Xóa phim',
-                confirmIcon: 'fa-trash-can',
-                cancelText: 'Giữ lại'
-            });
-            if (ok) document.getElementById(`delete-movie-form-${id}`).submit();
-        }
-
-        function validateMovieForm(form) {
-            const status = document.getElementById('form-status').value;
-            const releaseDateVal = document.getElementById('form-release').value;
-            
-            if (status === 'now_showing' && releaseDateVal) {
-                const today = new Date();
-                const year = today.getFullYear();
-                const month = String(today.getMonth() + 1).padStart(2, '0');
-                const day = String(today.getDate()).padStart(2, '0');
-                const todayStr = `${year}-${month}-${day}`;
-                
-                if (releaseDateVal > todayStr) {
-                    mfToast(
-                        'Lỗi logic ngày khởi chiếu',
-                        `Phim có ngày khởi chiếu ${formatDateStr(releaseDateVal)} nằm trong tương lai, không thể đặt trạng thái "Đang chiếu". Hãy đổi trạng thái thành "Sắp chiếu".`,
-                        'warning', 6000
-                    );
-                    document.getElementById('form-release').focus();
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        function formatDateStr(dateStr) {
-            const parts = dateStr.split('-');
-            if (parts.length === 3) {
-                return parts[2] + '/' + parts[1] + '/' + parts[0];
-            }
-            return dateStr;
-        }
+        // Initialize page
+        fetchStats();
+        fetchMovies();
     </script>
     <script src="../assets/js/script.js"></script>
 </body>
 </html>
-

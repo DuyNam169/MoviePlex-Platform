@@ -9,29 +9,29 @@
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --blue:#3B82F6;--blue-h:#2563EB;--blue-dark:#1D4ED8;
+  --blue:#DF1730;--blue-h:#C21025;--blue-dark:#A20B1D;
   --text:#0F172A;--muted:#64748B;--light:#94A3B8;--border:#E2E8F0;
   --red:#EF4444;--green:#10B981;
 }
 html{margin:0;padding:0;height:100%;overflow:hidden}
 body{font-family:'Inter',sans-serif;margin:0;padding:0;display:flex;height:100vh;width:100vw;max-width:100vw;overflow:hidden;position:fixed;top:0;left:0;right:0;bottom:0}
-.left{position:relative;flex:1 1 0%;overflow:hidden;background:#050D1A;min-width:0;max-width:100%}
+.left{position:relative;flex:1 1 0%;overflow:hidden;background:#0A0A0C;min-width:0;max-width:100%}
 .bg-slides{position:absolute;inset:0;z-index:0}
 .bg-slide{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transition:opacity 1.5s ease}
 .bg-slide.active{opacity:1}
-.bg-overlay{position:absolute;inset:0;z-index:1;background:linear-gradient(135deg,rgba(5,13,26,.92) 0%,rgba(5,13,26,.6) 50%,rgba(5,13,26,.82) 100%)}
+.bg-overlay{position:absolute;inset:0;z-index:1;background:linear-gradient(135deg,rgba(10,10,12,.92) 0%,rgba(10,10,12,.6) 50%,rgba(10,10,12,.82) 100%)}
 .particles{position:absolute;inset:0;z-index:2;overflow:hidden}
 .dot{position:absolute;width:3px;height:3px;background:rgba(255,255,255,.4);border-radius:50%;animation:float linear infinite}
 @keyframes float{0%{transform:translateY(100vh) scale(0);opacity:0}10%{opacity:1}90%{opacity:.6}100%{transform:translateY(-100px) scale(1.5);opacity:0}}
 .left-content{position:relative;z-index:3;height:100%;display:flex;flex-direction:column;justify-content:space-between;padding:36px 40px;overflow:hidden}
 .brand{display:flex;align-items:center;gap:14px}
-.brand-icon{width:48px;height:48px;background:linear-gradient(135deg,#3B82F6,#8B5CF6);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;box-shadow:0 8px 24px rgba(59,130,246,.5)}
+.brand-icon{width:48px;height:48px;background:var(--blue);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;box-shadow:0 8px 24px rgba(223,23,48,.3)}
 .brand-name{font-size:24px;font-weight:800;color:#fff;letter-spacing:-.5px}
-.brand-name span{color:#60A5FA}
+.brand-name span{color:var(--blue)}
 .hero-copy{margin-bottom:auto;padding-top:40px}
-.hero-label{display:inline-flex;align-items:center;gap:8px;background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3);color:#93C5FD;font-size:12px;font-weight:700;padding:6px 14px;border-radius:20px;letter-spacing:.6px;margin-bottom:24px;backdrop-filter:blur(8px)}
+.hero-label{display:inline-flex;align-items:center;gap:8px;background:rgba(223,23,48,.15);border:1px solid rgba(223,23,48,.3);color:#FCA5A5;font-size:12px;font-weight:700;padding:6px 14px;border-radius:20px;letter-spacing:.6px;margin-bottom:24px;backdrop-filter:blur(8px)}
 .hero-title{font-size:40px;font-weight:800;color:#fff;line-height:1.1;margin-bottom:14px;letter-spacing:-1.5px}
-.hero-title span{background:linear-gradient(90deg,#60A5FA,#A78BFA,#F472B6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-title span{color:var(--blue)}
 .hero-desc{font-size:14px;color:rgba(255,255,255,.6);line-height:1.6;max-width:340px}
 .movie-strip{display:flex;gap:10px;margin-bottom:0;overflow:hidden}
 .strip-card{border-radius:10px;overflow:hidden;flex-shrink:0;position:relative;box-shadow:0 6px 18px rgba(0,0,0,.5);transition:transform .3s;cursor:pointer}
@@ -42,11 +42,9 @@ body{font-family:'Inter',sans-serif;margin:0;padding:0;display:flex;height:100vh
 .stat{flex:1;text-align:center}
 .stat:not(:last-child){border-right:1px solid rgba(255,255,255,.1)}
 .stat-val{font-size:28px;font-weight:800;color:#fff;letter-spacing:-1px}
-.stat-val span{font-size:14px;background:linear-gradient(90deg,#60A5FA,#A78BFA);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.stat-val span{font-size:14px;color:var(--blue)}
 .stat-lbl{font-size:12px;color:rgba(255,255,255,.45);margin-top:3px;font-weight:500}
-.right{flex:0 0 400px;width:400px;min-width:0;background:linear-gradient(160deg,#FFFFFF 0%,#F0F4FF 100%);display:flex;flex-direction:column;justify-content:center;padding:40px 36px;overflow-y:auto;overflow-x:hidden;height:100vh;position:relative}
-.right::before{content:'';position:absolute;bottom:-60px;right:-60px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.08) 0%,transparent 70%);pointer-events:none}
-.right::after{content:'';position:absolute;top:-40px;left:-40px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(59,130,246,.07) 0%,transparent 70%);pointer-events:none}
+.right{flex:0 0 400px;width:400px;min-width:0;background:#fff;border-left:1px solid var(--border);display:flex;flex-direction:column;justify-content:center;padding:40px 36px;overflow-y:auto;overflow-x:hidden;height:100vh;position:relative}
 .form-header{margin-bottom:28px;position:relative;z-index:1}
 .form-header h2{font-size:26px;font-weight:800;color:#0F172A;letter-spacing:-.5px;margin-bottom:6px}
 .form-header p{font-size:13px;color:#64748B;line-height:1.6}
@@ -61,21 +59,21 @@ body{font-family:'Inter',sans-serif;margin:0;padding:0;display:flex;height:100vh
 .iw .il,.iw .ir{position:absolute;top:50%;transform:translateY(-50%);font-size:15px}
 .iw .il{left:14px;color:#94A3B8}
 .iw .ir{right:14px;color:#94A3B8;cursor:pointer;transition:color .2s}
-.iw .ir:hover{color:#3B82F6}
+.iw .ir:hover{color:var(--blue)}
 .iw input{width:100%;height:46px;border:1.5px solid #E2E8F0;border-radius:10px;padding:0 40px;font-size:14px;font-family:inherit;color:#0F172A;background:#FAFBFE;outline:none;transition:all .25s;font-weight:500}
 .iw input::placeholder{color:#CBD5E1;font-weight:400}
-.iw input:focus{border-color:#3B82F6;background:#fff;box-shadow:0 0 0 3px rgba(59,130,246,.12)}
+.iw input:focus{border-color:var(--blue);background:#fff;box-shadow:0 0 0 3px rgba(223,23,48,.12)}
 .iw input.err{border-color:#EF4444;background:#FFF8F8}
 .fe{display:none;font-size:12px;color:#EF4444;margin-top:4px;font-weight:500}
 .fe.show{display:block}
 .opts{display:flex;justify-content:space-between;align-items:center;margin:4px 0 20px;font-size:13px;position:relative;z-index:1}
 .chk{display:flex;align-items:center;gap:8px;cursor:pointer;color:#64748B;font-weight:500}
-.chk input{width:15px;height:15px;accent-color:#3B82F6;cursor:pointer}
-.lnk{color:#3B82F6;font-weight:700;text-decoration:none;font-size:13px;transition:opacity .2s}
+.chk input{width:15px;height:15px;accent-color:var(--blue);cursor:pointer}
+.lnk{color:var(--blue);font-weight:700;text-decoration:none;font-size:13px;transition:opacity .2s}
 .lnk:hover{opacity:.75}
-.btn{width:100%;height:48px;border:none;border-radius:10px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .25s;display:flex;align-items:center;justify-content:center;gap:10px;background:linear-gradient(135deg,#3B82F6 0%,#6366F1 100%);color:#fff;box-shadow:0 6px 20px rgba(59,130,246,.3);position:relative;overflow:hidden;margin-bottom:20px;z-index:1}
+.btn{width:100%;height:48px;border:none;border-radius:10px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .25s;display:flex;align-items:center;justify-content:center;gap:10px;background:var(--blue);color:#fff;box-shadow:0 6px 20px rgba(223,23,48,.3);position:relative;overflow:hidden;margin-bottom:20px;z-index:1}
 .btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.12),transparent)}
-.btn:hover{transform:translateY(-1px);box-shadow:0 10px 28px rgba(59,130,246,.4)}
+.btn:hover{transform:translateY(-1px);background:var(--blue-h);box-shadow:0 10px 28px rgba(223,23,48,.4)}
 .btn:active{transform:translateY(0)}
 .btn>*{position:relative;z-index:1}
 .btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
@@ -88,7 +86,7 @@ body{font-family:'Inter',sans-serif;margin:0;padding:0;display:flex;height:100vh
 #vr{display:none}
 @media(max-width:900px){
   .left{display:none}
-  .right{width:100%;padding:36px 24px;background:linear-gradient(160deg,#fff,#F0F4FF)}
+  .right{width:100%;padding:36px 24px;background:#fff;border-left:none}
 }
 </style>
 </head>
@@ -105,7 +103,7 @@ body{font-family:'Inter',sans-serif;margin:0;padding:0;display:flex;height:100vh
   <div class="bg-overlay"></div>
   <div class="particles" id="particles"></div>
   <div class="left-content">
-    <a href="/fe/pages/guest.php" class="brand" style="text-decoration:none;cursor:pointer" title="Xem trang khách">
+    <a href="guest.php" class="brand" style="text-decoration:none;cursor:pointer" title="Xem trang khách">
       <div class="brand-icon"><i class="fa-solid fa-clapperboard"></i></div>
       <div class="brand-name">Movie<span>Flex</span></div>
     </a>
@@ -159,7 +157,7 @@ body{font-family:'Inter',sans-serif;margin:0;padding:0;display:flex;height:100vh
       </div>
       <div class="opts">
         <label class="chk"><input type="checkbox" name="remember"><span>Ghi nhớ đăng nhập</span></label>
-        <a href="/fe/pages/forgot-password.php" class="lnk">Quên mật khẩu?</a>
+        <a href="forgot-password.php" class="lnk">Quên mật khẩu?</a>
       </div>
       <button class="btn" id="bl" type="submit">
         <div class="spin"></div>
@@ -229,7 +227,7 @@ body{font-family:'Inter',sans-serif;margin:0;padding:0;display:flex;height:100vh
 </div>
 
 <script>
-const AUTH_ENDPOINT = '/be/api.php';
+const AUTH_ENDPOINT = '../../be/api.php';
 
 if (sessionStorage.getItem('mf_show_register') === '1') {
   sessionStorage.removeItem('mf_show_register');
@@ -307,7 +305,7 @@ document.getElementById('fl').addEventListener('submit', async function(e) {
     const d = await r.json();
     if (d.success) {
       alert_('la', 'success', d.message || 'Đăng nhập thành công!');
-      setTimeout(() => location.href = d.redirect || '/fe/pages/home.php', 800);
+      setTimeout(() => location.href = d.redirect || 'home.php', 800);
     } else {
       alert_('la', 'error', d.message);
       setLoad('bl', false);

@@ -4,155 +4,6 @@ if (empty($_SESSION['user_id']) || !in_array($_SESSION['user_role'], ['admin', '
     header('Location: ../pages/login.php');
     exit;
 }
-
-require_once __DIR__ . '/../../be/config/db.php';
-
-$startDate = $_GET['startDate'] ?? '';
-$endDate = $_GET['endDate'] ?? '';
-
-if (!empty($startDate) && !empty($endDate)) {
-    $filter = 'custom';
-} else {
-    $filter = $_GET['filter'] ?? 'today';
-    if ($filter === 'week') {
-        $startDate = date('Y-m-d', strtotime('monday this week'));
-        $endDate = date('Y-m-d', strtotime('sunday this week'));
-    } elseif ($filter === 'month') {
-        $startDate = date('Y-m-01');
-        $endDate = date('Y-m-t');
-    } elseif ($filter === 'year') {
-        $startDate = date('Y-01-01');
-        $endDate = date('Y-12-31');
-    } else {
-        $filter = 'today';
-        $startDate = date('Y-m-d');
-        $endDate = date('Y-m-d');
-    }
-}
-
-$safe_start = $pdo->quote($startDate);
-$safe_end = $pdo->quote($endDate);
-
-$where_time = "DATE(created_at) BETWEEN $safe_start AND $safe_end";
-$where_time_b = "DATE(b.created_at) BETWEEN $safe_start AND $safe_end";
-
-$trend_title = "Xu hướng doanh số bán hàng (Từ " . date('d/m/Y', strtotime($startDate)) . " đến " . date('d/m/Y', strtotime($endDate)) . ")";
-
-// 1. Overall stats
-$total_revenue = $pdo->query("SELECT SUM(total_amount) FROM bookings WHERE status != 'cancelled' AND $where_time")->fetchColumn() ?: 0;
-$total_tickets = $pdo->query("SELECT SUM(num_tickets) FROM bookings WHERE status != 'cancelled' AND $where_time")->fetchColumn() ?: 0;
-$total_bookings = $pdo->query("SELECT COUNT(*) FROM bookings WHERE status != 'cancelled' AND $where_time")->fetchColumn() ?: 0;
-
-$ticket_revenue = $pdo->query("SELECT SUM(subtotal) FROM bookings WHERE status != 'cancelled' AND $where_time")->fetchColumn() ?: 0;
-$snack_revenue = $pdo->query("SELECT SUM(GREATEST(0, total_amount - subtotal + discount)) FROM bookings WHERE status != 'cancelled' AND $where_time")->fetchColumn() ?: 0;
-
-// Online stats
-$online_revenue = $pdo->query("SELECT SUM(total_amount) FROM bookings WHERE status != 'cancelled' AND payment_method != 'cash' AND $where_time")->fetchColumn() ?: 0;
-$online_tickets = $pdo->query("SELECT SUM(num_tickets) FROM bookings WHERE status != 'cancelled' AND payment_method != 'cash' AND $where_time")->fetchColumn() ?: 0;
-$online_bookings = $pdo->query("SELECT COUNT(*) FROM bookings WHERE status != 'cancelled' AND payment_method != 'cash' AND $where_time")->fetchColumn() ?: 0;
-$online_ticket_revenue = $pdo->query("SELECT SUM(subtotal) FROM bookings WHERE status != 'cancelled' AND payment_method != 'cash' AND $where_time")->fetchColumn() ?: 0;
-$online_snack_revenue = $pdo->query("SELECT SUM(GREATEST(0, total_amount - subtotal + discount)) FROM bookings WHERE status != 'cancelled' AND payment_method != 'cash' AND $where_time")->fetchColumn() ?: 0;
-
-// Direct / Counter stats
-$direct_revenue = $pdo->query("SELECT SUM(total_amount) FROM bookings WHERE status != 'cancelled' AND payment_method = 'cash' AND $where_time")->fetchColumn() ?: 0;
-$direct_tickets = $pdo->query("SELECT SUM(num_tickets) FROM bookings WHERE status != 'cancelled' AND payment_method = 'cash' AND $where_time")->fetchColumn() ?: 0;
-$direct_bookings = $pdo->query("SELECT COUNT(*) FROM bookings WHERE status != 'cancelled' AND payment_method = 'cash' AND $where_time")->fetchColumn() ?: 0;
-$direct_ticket_revenue = $pdo->query("SELECT SUM(subtotal) FROM bookings WHERE status != 'cancelled' AND payment_method = 'cash' AND $where_time")->fetchColumn() ?: 0;
-$direct_snack_revenue = $pdo->query("SELECT SUM(GREATEST(0, total_amount - subtotal + discount)) FROM bookings WHERE status != 'cancelled' AND payment_method = 'cash' AND $where_time")->fetchColumn() ?: 0;
-
-// 2. Revenue by Movie
-$movie_revenue = $pdo->query("
-    SELECT m.title, m.poster_url, COUNT(b.id) as bookings_count, SUM(b.num_tickets) as tickets_count, SUM(b.total_amount) as revenue
-    FROM bookings b
-    JOIN showtimes s ON b.showtime_id = s.id
-    JOIN movies m ON s.movie_id = m.id
-    WHERE b.status != 'cancelled' AND $where_time_b
-    GROUP BY m.id
-    ORDER BY revenue DESC
-")->fetchAll();
-
-// 3. Revenue by Cinema
-$cinema_revenue = $pdo->query("
-    SELECT c.name as cinema_name, COUNT(b.id) as bookings_count, SUM(b.num_tickets) as tickets_count, SUM(b.total_amount) as revenue
-    FROM bookings b
-    JOIN showtimes s ON b.showtime_id = s.id
-    JOIN cinemas c ON s.cinema_id = c.id
-    WHERE b.status != 'cancelled' AND $where_time_b
-    GROUP BY c.id
-    ORDER BY revenue DESC
-")->fetchAll();
-
-// 4. Detailed Bookings
-$detailed_bookings = $pdo->query("
-    SELECT b.*, u.full_name as customer_name, m.title as movie_title, c.name as cinema_name
-    FROM bookings b
-    LEFT JOIN users u ON b.user_id = u.id
-    JOIN showtimes s ON b.showtime_id = s.id
-    JOIN movies m ON s.movie_id = m.id
-    JOIN cinemas c ON s.cinema_id = c.id
-    WHERE b.status != 'cancelled' AND $where_time_b
-    ORDER BY b.created_at DESC
-    LIMIT 50
-")->fetchAll(PDO::FETCH_ASSOC);
-
-// 5. Daily Sales Trend for the Chart (scales hourly vs daily)
-if ($startDate === $endDate) {
-    // Single day: group by hour
-    $daily_sales = $pdo->query("
-        SELECT 
-            DATE_FORMAT(created_at, '%H:00') as day_label, 
-            SUM(CASE WHEN payment_method != 'cash' THEN total_amount ELSE 0 END) as online_revenue,
-            SUM(CASE WHEN payment_method = 'cash' THEN total_amount ELSE 0 END) as direct_revenue,
-            SUM(total_amount) as revenue
-        FROM bookings
-        WHERE status != 'cancelled' AND DATE(created_at) = $safe_start
-        GROUP BY HOUR(created_at)
-        ORDER BY created_at ASC
-    ")->fetchAll(PDO::FETCH_ASSOC);
-} else {
-    // Multi day: group by date
-    $daily_sales = $pdo->query("
-        SELECT 
-            DATE_FORMAT(created_at, '%d/%m') as day_label, 
-            SUM(CASE WHEN payment_method != 'cash' THEN total_amount ELSE 0 END) as online_revenue,
-            SUM(CASE WHEN payment_method = 'cash' THEN total_amount ELSE 0 END) as direct_revenue,
-            SUM(total_amount) as revenue
-        FROM bookings
-        WHERE status != 'cancelled' AND DATE(created_at) BETWEEN $safe_start AND $safe_end
-        GROUP BY DATE(created_at)
-        ORDER BY DATE(created_at) ASC
-    ")->fetchAll(PDO::FETCH_ASSOC);
-}
-
-// Generate placeholders if empty
-if (empty($daily_sales)) {
-    $daily_sales = [];
-    if ($startDate === $endDate) {
-        for ($h = 8; $h <= 23; $h += 2) {
-            $daily_sales[] = [
-                'day_label' => sprintf('%02d:00', $h),
-                'online_revenue' => 0,
-                'direct_revenue' => 0,
-                'revenue' => 0
-            ];
-        }
-    } else {
-        $curr = strtotime($startDate);
-        $last = strtotime($endDate);
-        $days_diff = round(($last - $curr) / 86400);
-        if ($days_diff <= 31) {
-            while ($curr <= $last) {
-                $daily_sales[] = [
-                    'day_label' => date('d/m', $curr),
-                    'online_revenue' => 0,
-                    'direct_revenue' => 0,
-                    'revenue' => 0
-                ];
-                $curr = strtotime("+1 day", $curr);
-            }
-        }
-    }
-}
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -160,7 +11,7 @@ if (empty($daily_sales)) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MovieFlex Admin - Báo cáo Doanh thu</title>
-    <link rel="stylesheet" href="/fe/assets/css/styles.css">
+    <link rel="stylesheet" href="../assets/css/styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -222,22 +73,22 @@ if (empty($daily_sales)) {
                         <div class="filter-item" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 12px; background: white; display: flex; align-items: center; gap: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                             <i class="fa-solid fa-clock-rotate-left" style="color: var(--text-muted); font-size: 14px;"></i>
                             <select id="time-filter" onchange="applyTimeFilter(this.value)" style="border: none; outline: none; font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: inherit; color: var(--text-main); background: transparent; padding-right: 4px;">
-                                <option value="today" <?= $filter === 'today' ? 'selected' : '' ?>>Hôm nay</option>
-                                <option value="week" <?= $filter === 'week' ? 'selected' : '' ?>>Tuần này</option>
-                                <option value="month" <?= $filter === 'month' ? 'selected' : '' ?>>Tháng này</option>
-                                <option value="year" <?= $filter === 'year' ? 'selected' : '' ?>>Năm nay</option>
-                                <option value="custom" <?= $filter === 'custom' ? 'selected' : '' ?> disabled>Khoảng ngày</option>
+                                <option value="today">Hôm nay</option>
+                                <option value="week">Tuần này</option>
+                                <option value="month">Tháng này</option>
+                                <option value="year">Năm nay</option>
+                                <option value="custom" id="time-filter-custom" disabled>Khoảng ngày</option>
                             </select>
                         </div>
 
                         <!-- Lọc theo khoảng ngày -->
                         <div class="filter-item" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 4px 8px; background: white; display: flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 600; color: var(--text-muted); box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                             <span>Từ</span>
-                            <input type="date" id="filter-start-date" value="<?= htmlspecialchars($startDate) ?>" style="border: none; outline: none; font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: inherit; color: var(--text-main);">
+                            <input type="date" id="filter-start-date" style="border: none; outline: none; font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: inherit; color: var(--text-main);">
                         </div>
                         <div class="filter-item" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 4px 8px; background: white; display: flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 600; color: var(--text-muted); box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                             <span>Đến</span>
-                            <input type="date" id="filter-end-date" value="<?= htmlspecialchars($endDate) ?>" style="border: none; outline: none; font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: inherit; color: var(--text-main);">
+                            <input type="date" id="filter-end-date" style="border: none; outline: none; font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: inherit; color: var(--text-main);">
                         </div>
                         <button class="btn btn-primary" onclick="applyCustomDateFilter()" style="padding: 8px 16px; font-size: 13.5px; font-weight: 600; border-radius: 8px;"><i class="fa-solid fa-filter"></i> Lọc</button>
 
@@ -251,55 +102,55 @@ if (empty($daily_sales)) {
                         <div>
                             <div class="kpi-icon blue" style="width:40px; height:40px; border-radius:10px;"><i class="fa-solid fa-coins"></i></div>
                             <p class="kpi-label" style="font-size:11px; margin-top:12px;">TỔNG DOANH THU</p>
-                            <h3 class="kpi-value" style="font-size:20px; font-weight:700; color:var(--text-main); margin:4px 0 8px;"><?= number_format($total_revenue, 0, ',', '.') ?>₫</h3>
+                            <h3 class="kpi-value" id="kpi-total-revenue" style="font-size:20px; font-weight:700; color:var(--text-main); margin:4px 0 8px;">0₫</h3>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-top: auto; padding-top: 10px; border-top: 1px dashed var(--border-color); font-size: 11px; color: var(--text-muted);">
-                            <span><i class="fa-solid fa-globe" style="color:var(--primary-blue); margin-right:3px;"></i> Online: <strong><?= number_format($online_revenue, 0, ',', '.') ?>₫</strong></span>
-                            <span><i class="fa-solid fa-shop" style="color:#F59E0B; margin-right:3px;"></i> Quầy: <strong><?= number_format($direct_revenue, 0, ',', '.') ?>₫</strong></span>
+                            <span id="kpi-online-revenue"><i class="fa-solid fa-globe" style="color:var(--primary-blue); margin-right:3px;"></i> Online: <strong>0₫</strong></span>
+                            <span id="kpi-direct-revenue"><i class="fa-solid fa-shop" style="color:#F59E0B; margin-right:3px;"></i> Quầy: <strong>0₫</strong></span>
                         </div>
                     </div>
                     <div class="kpi-card" style="display:flex; flex-direction:column; justify-content:space-between; padding: 20px; box-shadow: var(--shadow-sm); border-radius: var(--radius-md);">
                         <div>
                             <div class="kpi-icon green" style="width:40px; height:40px; border-radius:10px;"><i class="fa-solid fa-ticket"></i></div>
                             <p class="kpi-label" style="font-size:11px; margin-top:12px;">VÉ PHIM ĐÃ BÁN</p>
-                            <h3 class="kpi-value" style="font-size:20px; font-weight:700; color:var(--text-main); margin:4px 0 8px;"><?= number_format($total_tickets, 0, ',', '.') ?> vé</h3>
+                            <h3 class="kpi-value" id="kpi-total-tickets" style="font-size:20px; font-weight:700; color:var(--text-main); margin:4px 0 8px;">0 vé</h3>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-top: auto; padding-top: 10px; border-top: 1px dashed var(--border-color); font-size: 11px; color: var(--text-muted);">
-                            <span><i class="fa-solid fa-globe" style="color:var(--primary-blue); margin-right:3px;"></i> Online: <strong><?= number_format($online_tickets, 0, ',', '.') ?></strong></span>
-                            <span><i class="fa-solid fa-shop" style="color:#F59E0B; margin-right:3px;"></i> Quầy: <strong><?= number_format($direct_tickets, 0, ',', '.') ?></strong></span>
+                            <span id="kpi-online-tickets"><i class="fa-solid fa-globe" style="color:var(--primary-blue); margin-right:3px;"></i> Online: <strong>0</strong></span>
+                            <span id="kpi-direct-tickets"><i class="fa-solid fa-shop" style="color:#F59E0B; margin-right:3px;"></i> Quầy: <strong>0</strong></span>
                         </div>
                     </div>
                     <div class="kpi-card" style="display:flex; flex-direction:column; justify-content:space-between; padding: 20px; box-shadow: var(--shadow-sm); border-radius: var(--radius-md);">
                         <div>
                             <div class="kpi-icon teal" style="width:40px; height:40px; border-radius:10px;"><i class="fa-solid fa-cart-shopping"></i></div>
                             <p class="kpi-label" style="font-size:11px; margin-top:12px;">DOANH THU BẮP NƯỚC</p>
-                            <h3 class="kpi-value" style="font-size:20px; font-weight:700; color:var(--text-main); margin:4px 0 8px;"><?= number_format($snack_revenue, 0, ',', '.') ?>₫</h3>
+                            <h3 class="kpi-value" id="kpi-snack-revenue" style="font-size:20px; font-weight:700; color:var(--text-main); margin:4px 0 8px;">0₫</h3>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-top: auto; padding-top: 10px; border-top: 1px dashed var(--border-color); font-size: 11px; color: var(--text-muted);">
-                            <span><i class="fa-solid fa-globe" style="color:var(--primary-blue); margin-right:3px;"></i> Online: <strong><?= number_format($online_snack_revenue, 0, ',', '.') ?>₫</strong></span>
-                            <span><i class="fa-solid fa-shop" style="color:#F59E0B; margin-right:3px;"></i> Quầy: <strong><?= number_format($direct_snack_revenue, 0, ',', '.') ?>₫</strong></span>
+                            <span id="kpi-online-snack-revenue"><i class="fa-solid fa-globe" style="color:var(--primary-blue); margin-right:3px;"></i> Online: <strong>0₫</strong></span>
+                            <span id="kpi-direct-snack-revenue"><i class="fa-solid fa-shop" style="color:#F59E0B; margin-right:3px;"></i> Quầy: <strong>0₫</strong></span>
                         </div>
                     </div>
                     <div class="kpi-card" style="display:flex; flex-direction:column; justify-content:space-between; padding: 20px; box-shadow: var(--shadow-sm); border-radius: var(--radius-md);">
                         <div>
                             <div class="kpi-icon red" style="width:40px; height:40px; border-radius:10px;"><i class="fa-solid fa-receipt"></i></div>
                             <p class="kpi-label" style="font-size:11px; margin-top:12px;">TỔNG GIAO DỊCH</p>
-                            <h3 class="kpi-value" style="font-size:20px; font-weight:700; color:var(--text-main); margin:4px 0 8px;"><?= $total_bookings ?> đơn</h3>
+                            <h3 class="kpi-value" id="kpi-total-bookings" style="font-size:20px; font-weight:700; color:var(--text-main); margin:4px 0 8px;">0 đơn</h3>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-top: auto; padding-top: 10px; border-top: 1px dashed var(--border-color); font-size: 11px; color: var(--text-muted);">
-                            <span><i class="fa-solid fa-globe" style="color:var(--primary-blue); margin-right:3px;"></i> Online: <strong><?= $online_bookings ?></strong></span>
-                            <span><i class="fa-solid fa-shop" style="color:#F59E0B; margin-right:3px;"></i> Quầy: <strong><?= $direct_bookings ?></strong></span>
+                            <span id="kpi-online-bookings"><i class="fa-solid fa-globe" style="color:var(--primary-blue); margin-right:3px;"></i> Online: <strong>0</strong></span>
+                            <span id="kpi-direct-bookings"><i class="fa-solid fa-shop" style="color:#F59E0B; margin-right:3px;"></i> Quầy: <strong>0</strong></span>
                         </div>
                     </div>
                     <div class="kpi-card" style="display:flex; flex-direction:column; justify-content:space-between; padding: 20px; box-shadow: var(--shadow-sm); border-radius: var(--radius-md);">
                         <div>
                             <div class="kpi-icon gray" style="width:40px; height:40px; border-radius:10px;"><i class="fa-solid fa-calculator"></i></div>
                             <p class="kpi-label" style="font-size:11px; margin-top:12px;">GIÁ VÉ TRUNG BÌNH</p>
-                            <h3 class="kpi-value" style="font-size:20px; font-weight:700; color:var(--text-main); margin:4px 0 8px;"><?= $total_tickets > 0 ? number_format($ticket_revenue / $total_tickets, 0, ',', '.') : '0' ?>₫</h3>
+                            <h3 class="kpi-value" id="kpi-avg-ticket" style="font-size:20px; font-weight:700; color:var(--text-main); margin:4px 0 8px;">0₫</h3>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-top: auto; padding-top: 10px; border-top: 1px dashed var(--border-color); font-size: 11px; color: var(--text-muted);">
-                            <span><i class="fa-solid fa-globe" style="color:var(--primary-blue); margin-right:3px;"></i> Online: <strong><?= $online_tickets > 0 ? number_format($online_ticket_revenue / $online_tickets, 0, ',', '.') : '0' ?>₫</strong></span>
-                            <span><i class="fa-solid fa-shop" style="color:#F59E0B; margin-right:3px;"></i> Quầy: <strong><?= $direct_tickets > 0 ? number_format($direct_ticket_revenue / $direct_tickets, 0, ',', '.') : '0' ?>₫</strong></span>
+                            <span id="kpi-online-avg-ticket"><i class="fa-solid fa-globe" style="color:var(--primary-blue); margin-right:3px;"></i> Online: <strong>0₫</strong></span>
+                            <span id="kpi-direct-avg-ticket"><i class="fa-solid fa-shop" style="color:#F59E0B; margin-right:3px;"></i> Quầy: <strong>0₫</strong></span>
                         </div>
                     </div>
                 </div>
@@ -309,7 +160,7 @@ if (empty($daily_sales)) {
                     <!-- Line Chart Card -->
                     <div class="card" style="margin-bottom: 0;">
                         <div class="card-header">
-                            <h3><?= htmlspecialchars($trend_title) ?></h3>
+                            <h3 id="chart-title-text">Xu hướng doanh số bán hàng</h3>
                         </div>
                         <div class="chart-container">
                             <canvas id="salesTrendChart"></canvas>
@@ -326,36 +177,32 @@ if (empty($daily_sales)) {
                                 <div>
                                     <span style="font-weight:600; color:var(--text-main); font-size:13.5px;">Doanh thu vé xem phim</span>
                                     <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">
-                                        <span style="margin-right:12px;"><i class="fa-solid fa-globe" style="color:var(--primary-blue); margin-right:4px;"></i>Online: <strong><?= number_format($online_ticket_revenue, 0, ',', '.') ?>₫</strong></span>
-                                        <span><i class="fa-solid fa-shop" style="color:#F59E0B; margin-right:4px;"></i>Tại quầy: <strong><?= number_format($direct_ticket_revenue, 0, ',', '.') ?>₫</strong></span>
+                                        <span style="margin-right:12px;"><i class="fa-solid fa-globe" style="color:var(--primary-blue); margin-right:4px;"></i>Online: <strong id="breakdown-ticket-online">0₫</strong></span>
+                                        <span><i class="fa-solid fa-shop" style="color:#F59E0B; margin-right:4px;"></i>Tại quầy: <strong id="breakdown-ticket-direct">0₫</strong></span>
                                     </div>
                                 </div>
-                                <strong style="color:var(--primary-blue); font-size:15px;"><?= number_format($ticket_revenue, 0, ',', '.') ?>₫</strong>
+                                <strong id="breakdown-ticket-revenue" style="color:var(--primary-blue); font-size:15px;">0₫</strong>
                             </div>
                             <div class="stat-detail-item" style="padding-bottom: 16px; margin-bottom: 16px;">
                                 <div>
                                     <span style="font-weight:600; color:var(--text-main); font-size:13.5px;">Doanh thu bắp nước & Dịch vụ</span>
                                     <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">
-                                        <span style="margin-right:12px;"><i class="fa-solid fa-globe" style="color:var(--primary-blue); margin-right:4px;"></i>Online: <strong><?= number_format($online_snack_revenue, 0, ',', '.') ?>₫</strong></span>
-                                        <span><i class="fa-solid fa-shop" style="color:#F59E0B; margin-right:4px;"></i>Tại quầy: <strong><?= number_format($direct_snack_revenue, 0, ',', '.') ?>₫</strong></span>
+                                        <span style="margin-right:12px;"><i class="fa-solid fa-globe" style="color:var(--primary-blue); margin-right:4px;"></i>Online: <strong id="breakdown-snack-online">0₫</strong></span>
+                                        <span><i class="fa-solid fa-shop" style="color:#F59E0B; margin-right:4px;"></i>Tại quầy: <strong id="breakdown-snack-direct">0₫</strong></span>
                                     </div>
                                 </div>
-                                <strong style="color:var(--primary-blue); font-size:15px;"><?= number_format($snack_revenue, 0, ',', '.') ?>₫</strong>
+                                <strong id="breakdown-snack-revenue" style="color:var(--primary-blue); font-size:15px;">0₫</strong>
                             </div>
                         </div>
 
                         <div style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 20px;">
                             <span style="font-weight:700; font-size:13px; color:var(--text-main);">Tỉ lệ cơ cấu Doanh thu (Vé vs Bắp nước)</span>
-                            <?php 
-                                $ticketPct = $total_revenue > 0 ? ($ticket_revenue / $total_revenue) * 100 : 80;
-                                $snackPct = 100 - $ticketPct;
-                            ?>
                             <div style="display:flex; justify-content:space-between; font-size:12px; margin-top:10px; font-weight:600; color:var(--text-muted);">
-                                <span>Vé: <?= round($ticketPct) ?>%</span>
-                                <span>Bắp nước: <?= round($snackPct) ?>%</span>
+                                <span id="pct-ticket-text">Vé: 80%</span>
+                                <span id="pct-snack-text">Bắp nước: 20%</span>
                             </div>
                             <div class="progress-bar-wrap">
-                                <div class="progress-bar-fill" style="width: <?= $ticketPct ?>%;"></div>
+                                <div class="progress-bar-fill" id="pct-progress-fill" style="width: 80%;"></div>
                             </div>
                         </div>
                     </div>
@@ -377,26 +224,8 @@ if (empty($daily_sales)) {
                                     <th style="text-align: right;">Doanh thu</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <?php if (empty($movie_revenue)): ?>
-                                <tr><td colspan="4" class="text-center" style="padding: 20px; color: var(--text-muted);">Chưa có giao dịch phim nào.</td></tr>
-                                <?php else: ?>
-                                <?php foreach (array_slice($movie_revenue, 0, 5) as $mr): ?>
-                                <tr>
-                                    <td>
-                                        <div style="display:flex; align-items:center; gap:8px;">
-                                            <?php if ($mr['poster_url']): ?>
-                                                <img src="<?= htmlspecialchars($mr['poster_url']) ?>" alt="" style="width:25px; height:35px; object-fit:cover; border-radius:4px;">
-                                            <?php endif; ?>
-                                            <span style="font-weight:700; color:#111;"><?= htmlspecialchars($mr['title']) ?></span>
-                                        </div>
-                                    </td>
-                                    <td class="text-center"><strong><?= $mr['bookings_count'] ?></strong> đơn</td>
-                                    <td class="text-center"><strong><?= $mr['tickets_count'] ?></strong> vé</td>
-                                    <td style="text-align: right; font-weight:700; color:var(--primary-blue);"><?= number_format($mr['revenue'], 0, ',', '.') ?>₫</td>
-                                </tr>
-                                <?php endforeach; ?>
-                                <?php endif; ?>
+                            <tbody id="movie-revenue-body">
+                                <tr><td colspan="4" class="text-center" style="padding: 20px; color: var(--text-muted);">Đang tải dữ liệu phim...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -415,19 +244,8 @@ if (empty($daily_sales)) {
                                     <th style="text-align: right;">Doanh thu</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <?php if (empty($cinema_revenue)): ?>
-                                <tr><td colspan="4" class="text-center" style="padding: 20px; color: var(--text-muted);">Chưa có giao dịch rạp nào.</td></tr>
-                                <?php else: ?>
-                                <?php foreach ($cinema_revenue as $cr): ?>
-                                <tr>
-                                    <td><strong style="color:#111;"><i class="fa-solid fa-location-dot" style="color:var(--primary-blue); margin-right:6px;"></i><?= htmlspecialchars($cr['cinema_name']) ?></strong></td>
-                                    <td class="text-center"><strong><?= $cr['bookings_count'] ?></strong> đơn</td>
-                                    <td class="text-center"><strong><?= $cr['tickets_count'] ?></strong> vé</td>
-                                    <td style="text-align: right; font-weight:700; color:var(--primary-blue);"><?= number_format($cr['revenue'], 0, ',', '.') ?>₫</td>
-                                </tr>
-                                <?php endforeach; ?>
-                                <?php endif; ?>
+                            <tbody id="cinema-revenue-body">
+                                <tr><td colspan="4" class="text-center" style="padding: 20px; color: var(--text-muted);">Đang tải dữ liệu rạp...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -453,51 +271,8 @@ if (empty($daily_sales)) {
                                     <th style="text-align: right;">TỔNG TIỀN</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <?php if (empty($detailed_bookings)): ?>
-                                <tr><td colspan="8" class="text-center" style="padding: 40px; color: var(--text-muted); font-weight:600;">Không tìm thấy giao dịch nào phù hợp trong khoảng thời gian này.</td></tr>
-                                <?php else: ?>
-                                <?php foreach ($detailed_bookings as $b): ?>
-                                <tr>
-                                    <td><strong style="color:var(--text-main); font-family:monospace; font-size:13px;"><?= htmlspecialchars($b['booking_code']) ?></strong></td>
-                                    <td style="font-size:12px; color:var(--text-muted);"><?= date('d/m/Y H:i', strtotime($b['created_at'])) ?></td>
-                                    <td>
-                                        <div style="font-weight:600; color:#111;"><?= htmlspecialchars($b['customer_name'] ?: 'Khách vãng lai') ?></div>
-                                    </td>
-                                    <td class="text-center">
-                                        <?php if ($b['payment_method'] !== 'cash'): ?>
-                                            <span class="badge" style="background-color: var(--info-bg); color: var(--info-text); padding: 4px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-globe"></i> Online</span>
-                                        <?php else: ?>
-                                            <span class="badge" style="background-color: var(--warning-bg); color: var(--warning-text); padding: 4px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-shop"></i> Tại quầy</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <div style="font-weight:600; color:var(--text-main); font-size:13px;"><?= htmlspecialchars($b['movie_title']) ?></div>
-                                        <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">
-                                            Rạp: <strong><?= htmlspecialchars($b['cinema_name']) ?></strong> 
-                                            <?php 
-                                            $seats = json_decode($b['seats_json'], true) ?: [];
-                                            if (!empty($seats)): ?>
-                                            | Ghế: <strong><?= implode(', ', $seats) ?></strong>
-                                            <?php endif; ?>
-                                        </div>
-                                    </td>
-                                    <td class="text-center"><strong><?= $b['num_tickets'] ?></strong></td>
-                                    <td>
-                                        <span style="font-size:12px; font-weight:600; color:var(--text-main); text-transform:uppercase;">
-                                            <?php if ($b['payment_method'] === 'cash'): ?>
-                                                <i class="fa-solid fa-money-bill-1" style="color:#15803D; margin-right:4px;"></i> Tiền mặt
-                                            <?php elseif ($b['payment_method'] === 'card'): ?>
-                                                <i class="fa-solid fa-credit-card" style="color:#0369A1; margin-right:4px;"></i> Thẻ (POS)
-                                            <?php else: ?>
-                                                <i class="fa-solid fa-wallet" style="color:#4F46E5; margin-right:4px;"></i> <?= htmlspecialchars($b['payment_method']) ?>
-                                            <?php endif; ?>
-                                        </span>
-                                    </td>
-                                    <td style="text-align: right; font-weight:700; color:var(--primary-blue); font-size:14px;"><?= number_format($b['total_amount'], 0, ',', '.') ?>₫</td>
-                                </tr>
-                                <?php endforeach; ?>
-                                <?php endif; ?>
+                            <tbody id="detailed-bookings-body">
+                                <tr><td colspan="8" class="text-center" style="padding: 40px; color: var(--text-muted); font-weight:600;">Đang tải danh sách giao dịch...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -510,104 +285,344 @@ if (empty($daily_sales)) {
     <script src="../assets/js/script.js"></script>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const salesData = <?= json_encode($daily_sales) ?>;
-            const labels = salesData.map(item => item.day_label);
-            const onlineRevenues = salesData.map(item => parseFloat(item.online_revenue) || 0);
-            const directRevenues = salesData.map(item => parseFloat(item.direct_revenue) || 0);
-            const revenues = salesData.map(item => parseFloat(item.revenue) || 0);
+        let salesChart = null;
 
-            const ctx = document.getElementById('salesTrendChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'Doanh thu Online (₫)',
-                            data: onlineRevenues,
-                            borderColor: '#4F46E5',
-                            backgroundColor: 'rgba(79, 70, 229, 0.04)',
-                            borderWidth: 3,
-                            tension: 0.4,
-                            fill: true,
-                            pointBackgroundColor: '#fff',
-                            pointBorderColor: '#4F46E5',
-                            pointBorderWidth: 2,
-                            pointRadius: 4,
-                            pointHoverRadius: 6
-                        },
-                        {
-                            label: 'Doanh thu tại Quầy (₫)',
-                            data: directRevenues,
-                            borderColor: '#F59E0B',
-                            backgroundColor: 'rgba(245, 158, 11, 0.04)',
-                            borderWidth: 3,
-                            tension: 0.4,
-                            fill: true,
-                            pointBackgroundColor: '#fff',
-                            pointBorderColor: '#F59E0B',
-                            pointBorderWidth: 2,
-                            pointRadius: 4,
-                            pointHoverRadius: 6
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top',
-                            labels: {
-                                font: {
-                                    family: 'Inter',
-                                    weight: '600',
-                                    size: 12
-                                },
-                                color: '#0F172A',
-                                usePointStyle: true,
-                                boxWidth: 8
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: {
-                                color: '#F1F3F5'
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.toString()
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        async function loadRevenueReport(params = {}) {
+            // Show loading indicators
+            const kpiElements = [
+                'kpi-total-revenue', 'kpi-total-tickets', 'kpi-snack-revenue', 'kpi-total-bookings', 'kpi-avg-ticket',
+                'breakdown-ticket-revenue', 'breakdown-ticket-online', 'breakdown-ticket-direct',
+                'breakdown-snack-revenue', 'breakdown-snack-online', 'breakdown-snack-direct'
+            ];
+            
+            kpiElements.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = '...';
+            });
+
+            const kpiSubElements = [
+                'kpi-online-revenue', 'kpi-direct-revenue', 'kpi-online-tickets', 'kpi-direct-tickets',
+                'kpi-online-snack-revenue', 'kpi-direct-snack-revenue', 'kpi-online-bookings', 'kpi-direct-bookings',
+                'kpi-online-avg-ticket', 'kpi-direct-avg-ticket'
+            ];
+            kpiSubElements.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.innerHTML = el.innerHTML.replace(/<strong>.*?<\/strong>/g, '<strong>...</strong>');
+                }
+            });
+
+            document.getElementById('movie-revenue-body').innerHTML = `
+                <tr><td colspan="4" class="text-center" style="padding: 20px; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</td></tr>
+            `;
+            document.getElementById('cinema-revenue-body').innerHTML = `
+                <tr><td colspan="4" class="text-center" style="padding: 20px; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</td></tr>
+            `;
+            document.getElementById('detailed-bookings-body').innerHTML = `
+                <tr><td colspan="8" class="text-center" style="padding: 40px; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải danh sách giao dịch...</td></tr>
+            `;
+
+            try {
+                const queryParams = new URLSearchParams();
+                queryParams.append('action', 'get_revenue_report');
+                for (const [key, val] of Object.entries(params)) {
+                    if (val) queryParams.append(key, val);
+                }
+
+                const res = await fetch('../../be/controllers/admin/AdminRevenueController.php?' + queryParams.toString());
+                const json = await res.json();
+                
+                if (!json.success) {
+                    mfToast('Lỗi', json.message || 'Lỗi tải báo cáo doanh thu', 'danger');
+                    return;
+                }
+
+                // Update filters state
+                document.getElementById('filter-start-date').value = json.startDate;
+                document.getElementById('filter-end-date').value = json.endDate;
+                
+                const timeFilterSelect = document.getElementById('time-filter');
+                const customOpt = document.getElementById('time-filter-custom');
+                
+                if (json.filter === 'custom') {
+                    customOpt.disabled = false;
+                    timeFilterSelect.value = 'custom';
+                } else {
+                    customOpt.disabled = true;
+                    timeFilterSelect.value = json.filter;
+                }
+
+                // Format dates for title
+                const formatTitleDate = (dStr) => {
+                    if (!dStr) return '';
+                    const p = dStr.split('-');
+                    return `${p[2]}/${p[1]}/${p[0]}`;
+                };
+                document.getElementById('chart-title-text').textContent = `Xu hướng doanh số bán hàng (Từ ${formatTitleDate(json.startDate)} đến ${formatTitleDate(json.endDate)})`;
+
+                // Format currencies and numbers helper
+                const fmtCurr = (val) => new Intl.NumberFormat('vi-VN').format(val) + '₫';
+                const fmtNum = (val) => new Intl.NumberFormat('vi-VN').format(val);
+
+                // Update KPIs
+                const kpis = json.kpis;
+                document.getElementById('kpi-total-revenue').textContent = fmtCurr(kpis.total_revenue);
+                document.getElementById('kpi-online-revenue').innerHTML = `<i class="fa-solid fa-globe" style="color:var(--primary-blue); margin-right:3px;"></i> Online: <strong>${fmtCurr(kpis.online.revenue)}</strong>`;
+                document.getElementById('kpi-direct-revenue').innerHTML = `<i class="fa-solid fa-shop" style="color:#F59E0B; margin-right:3px;"></i> Quầy: <strong>${fmtCurr(kpis.direct.revenue)}</strong>`;
+
+                document.getElementById('kpi-total-tickets').textContent = fmtNum(kpis.total_tickets) + ' vé';
+                document.getElementById('kpi-online-tickets').innerHTML = `<i class="fa-solid fa-globe" style="color:var(--primary-blue); margin-right:3px;"></i> Online: <strong>${fmtNum(kpis.online.tickets)}</strong>`;
+                document.getElementById('kpi-direct-tickets').innerHTML = `<i class="fa-solid fa-shop" style="color:#F59E0B; margin-right:3px;"></i> Quầy: <strong>${fmtNum(kpis.direct.tickets)}</strong>`;
+
+                document.getElementById('kpi-snack-revenue').textContent = fmtCurr(kpis.snack_revenue);
+                document.getElementById('kpi-online-snack-revenue').innerHTML = `<i class="fa-solid fa-globe" style="color:var(--primary-blue); margin-right:3px;"></i> Online: <strong>${fmtCurr(kpis.online.snack_revenue)}</strong>`;
+                document.getElementById('kpi-direct-snack-revenue').innerHTML = `<i class="fa-solid fa-shop" style="color:#F59E0B; margin-right:3px;"></i> Quầy: <strong>${fmtCurr(kpis.direct.snack_revenue)}</strong>`;
+
+                document.getElementById('kpi-total-bookings').textContent = fmtNum(kpis.total_bookings) + ' đơn';
+                document.getElementById('kpi-online-bookings').innerHTML = `<i class="fa-solid fa-globe" style="color:var(--primary-blue); margin-right:3px;"></i> Online: <strong>${fmtNum(kpis.online.bookings)}</strong>`;
+                document.getElementById('kpi-direct-bookings').innerHTML = `<i class="fa-solid fa-shop" style="color:#F59E0B; margin-right:3px;"></i> Quầy: <strong>${fmtNum(kpis.direct.bookings)}</strong>`;
+
+                const avgTicket = kpis.total_tickets > 0 ? (kpis.ticket_revenue / kpis.total_tickets) : 0;
+                const onlineAvg = kpis.online.tickets > 0 ? (kpis.online.ticket_revenue / kpis.online.tickets) : 0;
+                const directAvg = kpis.direct.tickets > 0 ? (kpis.direct.ticket_revenue / kpis.direct.tickets) : 0;
+                document.getElementById('kpi-avg-ticket').textContent = fmtCurr(avgTicket);
+                document.getElementById('kpi-online-avg-ticket').innerHTML = `<i class="fa-solid fa-globe" style="color:var(--primary-blue); margin-right:3px;"></i> Online: <strong>${fmtCurr(onlineAvg)}</strong>`;
+                document.getElementById('kpi-direct-avg-ticket').innerHTML = `<i class="fa-solid fa-shop" style="color:#F59E0B; margin-right:3px;"></i> Quầy: <strong>${fmtCurr(directAvg)}</strong>`;
+
+                // Update breakdowns
+                document.getElementById('breakdown-ticket-revenue').textContent = fmtCurr(kpis.ticket_revenue);
+                document.getElementById('breakdown-ticket-online').textContent = fmtCurr(kpis.online.ticket_revenue);
+                document.getElementById('breakdown-ticket-direct').textContent = fmtCurr(kpis.direct.ticket_revenue);
+
+                document.getElementById('breakdown-snack-revenue').textContent = fmtCurr(kpis.snack_revenue);
+                document.getElementById('breakdown-snack-online').textContent = fmtCurr(kpis.online.snack_revenue);
+                document.getElementById('breakdown-snack-direct').textContent = fmtCurr(kpis.direct.snack_revenue);
+
+                // Update progress bar
+                const ticketPct = kpis.total_revenue > 0 ? (kpis.ticket_revenue / kpis.total_revenue) * 100 : 80;
+                const snackPct = 100 - ticketPct;
+                document.getElementById('pct-ticket-text').textContent = `Vé: ${Math.round(ticketPct)}%`;
+                document.getElementById('pct-snack-text').textContent = `Bắp nước: ${Math.round(snackPct)}%`;
+                document.getElementById('pct-progress-fill').style.width = `${ticketPct}%`;
+
+                // Render line chart
+                const salesData = json.daily_sales;
+                const labels = salesData.map(item => item.day_label);
+                const onlineRevenues = salesData.map(item => parseFloat(item.online_revenue) || 0);
+                const directRevenues = salesData.map(item => parseFloat(item.direct_revenue) || 0);
+
+                if (salesChart) {
+                    salesChart.destroy();
+                }
+
+                const ctx = document.getElementById('salesTrendChart').getContext('2d');
+                salesChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Doanh thu Online (₫)',
+                                data: onlineRevenues,
+                                borderColor: '#4F46E5',
+                                backgroundColor: 'rgba(79, 70, 229, 0.04)',
+                                borderWidth: 3,
+                                tension: 0.4,
+                                fill: true,
+                                pointBackgroundColor: '#fff',
+                                pointBorderColor: '#4F46E5',
+                                pointBorderWidth: 2,
+                                pointRadius: 4,
+                                pointHoverRadius: 6
                             },
-                            ticks: {
-                                callback: function(value) {
-                                    if (value >= 1000000) {
-                                        return (value / 1000000).toFixed(1) + 'M';
+                            {
+                                label: 'Doanh thu tại Quầy (₫)',
+                                data: directRevenues,
+                                borderColor: '#F59E0B',
+                                backgroundColor: 'rgba(245, 158, 11, 0.04)',
+                                borderWidth: 3,
+                                tension: 0.4,
+                                fill: true,
+                                pointBackgroundColor: '#fff',
+                                pointBorderColor: '#F59E0B',
+                                pointBorderWidth: 2,
+                                pointRadius: 4,
+                                pointHoverRadius: 6
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                labels: {
+                                    font: {
+                                        family: 'Inter',
+                                        weight: '600',
+                                        size: 12
+                                    },
+                                    color: '#0F172A',
+                                    usePointStyle: true,
+                                    boxWidth: 8
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: '#F1F3F5'
+                                },
+                                ticks: {
+                                    callback: function(value) {
+                                        if (value >= 1000000) {
+                                            return (value / 1000000).toFixed(1) + 'M';
+                                        }
+                                        if (value >= 1000) {
+                                            return (value / 1000).toFixed(0) + 'K';
+                                        }
+                                        return value;
                                     }
-                                    if (value >= 1000) {
-                                        return (value / 1000).toFixed(0) + 'K';
-                                    }
-                                    return value;
+                                },
+                                border: {
+                                    display: false
                                 }
                             },
-                            border: {
-                                display: false
-                            }
-                        },
-                        x: {
-                            grid: {
-                                display: false
-                            },
-                            border: {
-                                display: false
+                            x: {
+                                grid: {
+                                    display: false
+                                },
+                                border: {
+                                    display: false
+                                }
                             }
                         }
                     }
+                });
+
+                // Render Movie Performance Table
+                const movieBody = document.getElementById('movie-revenue-body');
+                movieBody.innerHTML = '';
+                if (json.movie_revenue.length === 0) {
+                    movieBody.innerHTML = `<tr><td colspan="4" class="text-center" style="padding: 20px; color: var(--text-muted);">Chưa có giao dịch phim nào.</td></tr>`;
+                } else {
+                    json.movie_revenue.slice(0, 5).forEach(mr => {
+                        const posterHTML = mr.poster_url ? `<img src="${escapeHtml(mr.poster_url)}" alt="" style="width:25px; height:35px; object-fit:cover; border-radius:4px;">` : '';
+                        movieBody.innerHTML += `
+                            <tr>
+                                <td>
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        ${posterHTML}
+                                        <span style="font-weight:700; color:#111;">${escapeHtml(mr.title)}</span>
+                                    </div>
+                                </td>
+                                <td class="text-center"><strong>${mr.bookings_count}</strong> đơn</td>
+                                <td class="text-center"><strong>${mr.tickets_count}</strong> vé</td>
+                                <td style="text-align: right; font-weight:700; color:var(--primary-blue);">${fmtCurr(mr.revenue)}</td>
+                            </tr>
+                        `;
+                    });
                 }
-            });
-        });
+
+                // Render Cinema Performance Table
+                const cinemaBody = document.getElementById('cinema-revenue-body');
+                cinemaBody.innerHTML = '';
+                if (json.cinema_revenue.length === 0) {
+                    cinemaBody.innerHTML = `<tr><td colspan="4" class="text-center" style="padding: 20px; color: var(--text-muted);">Chưa có giao dịch rạp nào.</td></tr>`;
+                } else {
+                    json.cinema_revenue.forEach(cr => {
+                        cinemaBody.innerHTML += `
+                            <tr>
+                                <td><strong style="color:#111;"><i class="fa-solid fa-location-dot" style="color:var(--primary-blue); margin-right:6px;"></i>${escapeHtml(cr.cinema_name)}</strong></td>
+                                <td class="text-center"><strong>${cr.bookings_count}</strong> đơn</td>
+                                <td class="text-center"><strong>${cr.tickets_count}</strong> vé</td>
+                                <td style="text-align: right; font-weight:700; color:var(--primary-blue);">${fmtCurr(cr.revenue)}</td>
+                            </tr>
+                        `;
+                    });
+                }
+
+                // Render Detailed Transactions Table
+                const bookingsBody = document.getElementById('detailed-bookings-body');
+                bookingsBody.innerHTML = '';
+                if (json.detailed_bookings.length === 0) {
+                    bookingsBody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding: 40px; color: var(--text-muted); font-weight:600;">Không tìm thấy giao dịch nào phù hợp trong khoảng thời gian này.</td></tr>`;
+                } else {
+                    json.detailed_bookings.forEach(b => {
+                        const methodBadge = b.payment_method !== 'cash' 
+                            ? `<span class="badge" style="background-color: var(--info-bg); color: var(--info-text); padding: 4px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-globe"></i> Online</span>`
+                            : `<span class="badge" style="background-color: var(--warning-bg); color: var(--warning-text); padding: 4px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-shop"></i> Tại quầy</span>`;
+                        
+                        let payMethodHTML = '';
+                        if (b.payment_method === 'cash') {
+                            payMethodHTML = `<i class="fa-solid fa-money-bill-1" style="color:#15803D; margin-right:4px;"></i> Tiền mặt`;
+                        } else if (b.payment_method === 'card') {
+                            payMethodHTML = `<i class="fa-solid fa-credit-card" style="color:#0369A1; margin-right:4px;"></i> Thẻ (POS)`;
+                        } else {
+                            payMethodHTML = `<i class="fa-solid fa-wallet" style="color:#4F46E5; margin-right:4px;"></i> ${escapeHtml(b.payment_method)}`;
+                        }
+
+                        // Format time
+                        const dt = new Date(b.created_at);
+                        const pad = (n) => n.toString().padStart(2, '0');
+                        const timeStr = `${pad(dt.getDate())}/${pad(dt.getMonth()+1)}/${dt.getFullYear()} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+
+                        let seatsHTML = '';
+                        try {
+                            const seats = JSON.parse(b.seats_json) || [];
+                            if (seats.length > 0) {
+                                seatsHTML = `| Ghế: <strong>${escapeHtml(seats.join(', '))}</strong>`;
+                            }
+                        } catch(e) {}
+
+                        bookingsBody.innerHTML += `
+                            <tr>
+                                <td><strong style="color:var(--text-main); font-family:monospace; font-size:13px;">${escapeHtml(b.booking_code)}</strong></td>
+                                <td style="font-size:12px; color:var(--text-muted);">${timeStr}</td>
+                                <td>
+                                    <div style="font-weight:600; color:#111;">${escapeHtml(b.customer_name || 'Khách vãng lai')}</div>
+                                </td>
+                                <td class="text-center">${methodBadge}</td>
+                                <td>
+                                    <div style="font-weight:600; color:var(--text-main); font-size:13px;">${escapeHtml(b.movie_title)}</div>
+                                    <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">
+                                        Rạp: <strong>${escapeHtml(b.cinema_name)}</strong> 
+                                        ${seatsHTML}
+                                    </div>
+                                </td>
+                                <td class="text-center"><strong>${b.num_tickets}</strong></td>
+                                <td>
+                                    <span style="font-size:12px; font-weight:600; color:var(--text-main); text-transform:uppercase;">
+                                        ${payMethodHTML}
+                                    </span>
+                                </td>
+                                <td style="text-align: right; font-weight:700; color:var(--primary-blue); font-size:14px;">${fmtCurr(b.total_amount)}</td>
+                            </tr>
+                        `;
+                    });
+                }
+            } catch (e) {
+                console.error('Error fetching revenue report:', e);
+                mfToast('Lỗi hệ thống', 'Không thể kết nối với máy chủ.', 'warning');
+            }
+        }
 
         function applyTimeFilter(value) {
-            window.location.href = 'revenue.php?filter=' + value;
+            if (value === 'custom') return;
+            loadRevenueReport({ filter: value });
         }
 
         function applyCustomDateFilter() {
@@ -630,8 +645,20 @@ if (empty($daily_sales)) {
                 }
                 return;
             }
-            window.location.href = `revenue.php?startDate=${start}&endDate=${end}`;
+            loadRevenueReport({ startDate: start, endDate: end });
         }
+
+        // Initialize Page
+        document.addEventListener('DOMContentLoaded', () => {
+            // Get URL params for initial load if specified (e.g. from redirect or print page)
+            const urlParams = new URLSearchParams(window.location.search);
+            const initialParams = {};
+            if (urlParams.has('filter')) initialParams.filter = urlParams.get('filter');
+            if (urlParams.has('startDate')) initialParams.startDate = urlParams.get('startDate');
+            if (urlParams.has('endDate')) initialParams.endDate = urlParams.get('endDate');
+
+            loadRevenueReport(initialParams);
+        });
     </script>
 </body>
 </html>

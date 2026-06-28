@@ -6,5 +6,5 @@
  * No business logic lives here.
  */
 
-header('Location: /be/web.php?action=dispatch');
+header('Location: ../../be/web.php?action=dispatch');
 exit;

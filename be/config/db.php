@@ -1,5 +1,5 @@
 <?php
-$host    = getenv('DB_HOST')     ?: 'mysql';
+$host    = getenv('DB_HOST')     ?: 'localhost';
 $db      = getenv('DB_NAME')     ?: 'movieflex_db';
 $user    = getenv('DB_USER')     ?: 'root';
 $pass    = getenv('DB_PASSWORD') ?: '';

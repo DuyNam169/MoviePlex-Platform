@@ -5,7 +5,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <aside class="sidebar">
     <div class="sidebar-header">
         <div class="logo" style="display: flex; align-items: center; width: 100%; cursor: pointer;" title="Thu gọn / Mở rộng Sidebar" data-tooltip="Thu gọn / Mở rộng">
-            <i class="fa-solid fa-film"></i>
+            <i class="fa-solid fa-clapperboard"></i>
             <div class="logo-text">
                 <h2>MovieFlex Admin</h2>
                 <p>HỆ THỐNG QUẢN TRỊ</p>
@@ -85,11 +85,11 @@ async function adminLogout() {
     const fd = new FormData();
     fd.append('action', 'logout');
     try {
-        const r = await fetch('/be/controllers/AuthController.php', {method: 'POST', body: fd});
+        const r = await fetch('../../be/api.php', {method: 'POST', body: fd});
         const d = await r.json();
-        window.location.href = d.redirect || '/fe/pages/login.php';
+        window.location.href = d.redirect || '../pages/login.php';
     } catch(e) {
-        window.location.href = '/fe/pages/login.php';
+        window.location.href = '../pages/login.php';
     }
 }
 </script>
