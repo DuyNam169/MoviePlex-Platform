@@ -1,66 +1,22 @@
 <?php
 session_start();
 if (empty($_SESSION['user_id'])) { header('Location: login.php'); exit; }
-require_once __DIR__ . '/../../be/config/db.php';
 
 $showtime_id = (int)($_GET['showtime_id'] ?? 0);
 if (!$showtime_id) { header('Location: home.php'); exit; }
-
-$st = $pdo->prepare("
-  SELECT s.*, m.title, m.duration_min, m.poster_url, m.age_rating,
-         c.name as cinema_name, c.address
-  FROM showtimes s
-  JOIN movies m ON s.movie_id = m.id
-  JOIN cinemas c ON s.cinema_id = c.id
-  WHERE s.id = ? LIMIT 1
-");
-$st->execute([$showtime_id]);
-$show = $st->fetch();
-if (!$show) { header('Location: home.php'); exit; }
-
-// Chặn truy cập nếu suất chiếu đã bị hủy hoặc bắt đầu quá 20 phút
-if ($show['is_cancelled'] == 1) {
-    header('Location: home.php');
-    exit;
-}
-
-$showtime_dt = strtotime($show['show_date'] . ' ' . $show['start_time']);
-if ($showtime_dt + 20 * 60 < time()) {
-    header('Location: home.php');
-    exit;
-}
-
-// Lấy ghế đã đặt
-$booked = $pdo->prepare("
-  SELECT seats_json FROM bookings
-  WHERE showtime_id = ? AND status != 'cancelled' AND payment_status = 'paid'
-");
-$booked->execute([$showtime_id]);
-$bookedSeats = [];
-foreach ($booked->fetchAll() as $row) {
-    $seats = json_decode($row['seats_json'], true) ?? [];
-    foreach ($seats as $s) $bookedSeats[] = $s;
-}
-
-// Cấu hình phòng chiếu: A-J, 10 ghế/hàng
-$rows = ['A','B','C','D','E','F','G','H','I','J'];
-$cols = 10;
-// VIP: hàng E,F,G; Sweetbox: cặp ghế cuối hàng J
-$vipRows = ['E','F','G'];
-$sweetboxPairs = [9,10]; // cặp ghế cuối
 ?>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Chọn ghế - <?= htmlspecialchars($show['title']) ?></title>
+<title>Chọn ghế - MovieFlex</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 :root{--blue:#DF1730;--bg:#F1F5F9;--card:#fff;--text:#0F172A;--muted:#64748B;--border:#E2E8F0;--r:14px}
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-/* TOPBAR */
+
 .topbar{background:var(--card);border-bottom:1px solid var(--border);height:60px;display:flex;align-items:center;padding:0 24px;gap:16px;position:sticky;top:0;z-index:100;box-shadow:0 1px 8px rgba(15,23,42,.06)}
 .logo{display:flex;align-items:center;gap:9px;text-decoration:none}
 .logo-icon{width:30px;height:30px;background:var(--blue);border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px}
@@ -76,14 +32,14 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .step.active .step-num{background:var(--blue);border-color:var(--blue);color:#fff}
 .step-line{width:40px;height:2px;background:var(--border);margin:0 8px}
 .step-line.done{background:#22C55E}
-/* MAIN LAYOUT */
+
 .layout{display:grid;grid-template-columns:1fr 320px;gap:20px;padding:20px 24px;max-width:1200px;margin:0 auto}
-/* SCREEN + SEATS */
+
 .seat-section{background:var(--card);border-radius:var(--r);padding:24px;box-shadow:0 2px 16px rgba(15,23,42,.07)}
 .screen-wrap{text-align:center;margin-bottom:28px}
 .screen{height:4px;background:#fff;border-radius:4px;margin:0 auto 12px;width:70%;box-shadow:0 0 16px rgba(255,255,255,0.8)}
 .screen-label{font-size:11px;color:var(--muted);letter-spacing:.5px;font-weight:600;text-transform:uppercase}
-/* LEGEND */
+
 .legend{display:flex;justify-content:center;gap:20px;margin-bottom:20px;flex-wrap:wrap}
 .legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);font-weight:500}
 .leg-box{width:18px;height:18px;border-radius:4px;border:1.5px solid var(--border)}
@@ -92,7 +48,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .leg-sweet{background:#FCE7F3;border-color:#EC4899}
 .leg-sel{background:#DF1730;border-color:#DF1730}
 .leg-taken{background:#E2E8F0;border-color:#CBD5E1;opacity:.5}
-/* SEAT GRID */
+
 .seat-grid{display:flex;flex-direction:column;gap:8px;align-items:center}
 .seat-row{display:flex;align-items:center;gap:6px}
 .row-label{width:20px;font-size:12px;font-weight:700;color:var(--muted);text-align:center}
@@ -105,7 +61,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .seat.taken{background:#E2E8F0;border-color:#E2E8F0;color:#CBD5E1;cursor:not-allowed;opacity:.6}
 .seat.taken:hover{transform:none}
 .aisle{width:16px}
-/* PANEL */
+
 .panel{background:var(--card);border-radius:var(--r);box-shadow:0 2px 16px rgba(15,23,42,.07);overflow:hidden;position:sticky;top:76px}
 .panel-head{padding:18px 20px;border-bottom:1px solid var(--border);background:var(--blue)}
 .panel-head h3{font-size:15px;font-weight:700;color:#fff}
@@ -126,32 +82,40 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .total-row{display:flex;justify-content:space-between;align-items:center;font-size:16px;font-weight:800;margin-bottom:16px}
 .total-price{color:var(--blue);font-size:20px}
 .btn-continue{width:100%;height:46px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .2s}
-.btn-continue:hover{background:#1D4ED8}
+.btn-continue:hover{background:#C21025}
 .btn-continue:disabled{opacity:.45;cursor:not-allowed}
 .max-note{text-align:center;font-size:12px;color:var(--muted);margin-top:10px}
 .ticket-count{display:flex;align-items:center;justify-content:space-between;background:var(--bg);border-radius:10px;padding:10px 14px;margin-bottom:14px}
 .tc-label{font-size:13px;font-weight:600}
-.tc-ctrl{display:flex;align-items:center;gap:10px}
-.tc-btn{width:28px;height:28px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;transition:all .2s;color:var(--blue)}
-.tc-btn:hover{border-color:var(--blue);background:#EFF6FF}
-.tc-val{font-size:16px;font-weight:800;width:24px;text-align:center}
-/* TOAST NOTIFICATION */
-.toast-container { position: fixed; top: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
-.toast { background: #fff; border-left: 4px solid #EF4444; box-shadow: 0 10px 25px -5px rgba(0,0,0,.1), 0 8px 10px -6px rgba(0,0,0,.1); border-radius: 8px; padding: 16px 20px; display: flex; align-items: center; gap: 14px; transform: translateX(120%); opacity: 0; transition: all 0.4s cubic-bezier(0.21, 1.02, 0.73, 1); min-width: 300px; }
-.toast.show { transform: translateX(0); opacity: 1; }
-.toast-icon { background: #FEF2F2; color: #EF4444; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
-.toast-content { flex: 1; }
-.toast-title { font-size: 14px; font-weight: 700; color: #0F172A; margin-bottom: 3px; }
-.toast-desc { font-size: 13px; color: var(--muted); line-height: 1.4; }
+
+.toast-container{position:fixed;top:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:10px;pointer-events:none}
+.toast{background:#fff;border-left:4px solid #EF4444;box-shadow:0 10px 25px -5px rgba(0,0,0,.1);border-radius:8px;padding:16px 20px;display:flex;align-items:center;gap:14px;transform:translateX(120%);opacity:0;transition:all 0.4s cubic-bezier(0.21,1.02,0.73,1);min-width:300px}
+.toast.show{transform:translateX(0);opacity:1}
+.toast-icon{background:#FEF2F2;color:#EF4444;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.toast-content{flex:1}
+.toast-title{font-size:14px;font-weight:700;color:#0F172A;margin-bottom:3px}
+.toast-desc{font-size:13px;color:var(--muted);line-height:1.4}
+
+.loading-overlay{position:fixed;inset:0;background:rgba(15,23,42,.4);z-index:500;display:flex;align-items:center;justify-content:center}
+.loading-overlay.hidden{display:none}
 </style>
 </head>
 <body>
 
 <div class="toast-container" id="toast-container"></div>
+<div class="loading-overlay hidden" id="loading-overlay">
+  <div style="background:#fff;border-radius:16px;padding:32px 40px;text-align:center;box-shadow:0 16px 48px rgba(0,0,0,.2)">
+    <i class="fa-solid fa-spinner fa-spin" style="font-size:32px;color:var(--blue);margin-bottom:12px;display:block"></i>
+    <div style="font-size:14px;font-weight:600;color:#0F172A">Đang tải sơ đồ ghế...</div>
+  </div>
+</div>
 
 <div class="topbar">
-  <a href="home.php" class="logo"><div class="logo-icon"><i class="fa-solid fa-clapperboard"></i></div><span class="logo-name">MovieFlex</span></a>
-  <a href="movie-detail.php?id=<?= $show['movie_id'] ?>" class="back-btn"><i class="fa-solid fa-arrow-left"></i> Quay lại</a>
+  <a href="home.php" class="logo">
+    <div class="logo-icon"><i class="fa-solid fa-clapperboard"></i></div>
+    <span class="logo-name">MovieFlex</span>
+  </a>
+  <a href="javascript:history.back()" class="back-btn"><i class="fa-solid fa-arrow-left"></i> Quay lại</a>
   <div class="step-bar">
     <div class="step done"><div class="step-num"><i class="fa-solid fa-check" style="font-size:9px"></i></div> Chọn phim</div>
     <div class="step-line done"></div>
@@ -163,14 +127,12 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
 </div>
 
-<div class="layout">
-  <!-- SEAT MAP -->
+<div class="layout" id="main-layout" style="display:none">
   <div class="seat-section">
     <div class="screen-wrap">
       <div class="screen"></div>
       <div class="screen-label">MÀN HÌNH</div>
     </div>
-
     <div class="legend">
       <div class="legend-item"><div class="leg-box leg-std"></div> Ghế thường</div>
       <div class="legend-item"><div class="leg-box leg-vip"></div> Ghế VIP</div>
@@ -178,104 +140,27 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="legend-item"><div class="leg-box leg-sel"></div> Đang chọn</div>
       <div class="legend-item"><div class="leg-box leg-taken"></div> Đã đặt</div>
     </div>
-
-    <div class="seat-grid">
-      <?php foreach($rows as $rowLetter):
-        $isVip = in_array($rowLetter, $vipRows);
-        $isLastRow = ($rowLetter === 'J');
-      ?>
-      <div class="seat-row">
-        <div class="row-label"><?= $rowLetter ?></div>
-        <?php
-        $col = 1;
-        while ($col <= $cols):
-          $seatKey = $rowLetter . '-' . str_pad($col, 2, '0', STR_PAD_LEFT);
-          $isTaken = in_array($seatKey, $bookedSeats);
-          // Sweetbox: hàng J, cặp ghế 9-10
-          if ($isLastRow && $col === 9):
-            $sk2 = $rowLetter . '-' . str_pad(10, 2, '0', STR_PAD_LEFT);
-            $takenSweet = $isTaken || in_array($sk2, $bookedSeats);
-        ?>
-          <div class="seat sweet <?= $takenSweet?'taken':'' ?>"
-            data-seat="<?= $seatKey ?>"
-            data-seat2="<?= $sk2 ?>"
-            data-type="sweetbox"
-            data-price="<?= $show['price'] * 2 ?>"
-            onclick="<?= $takenSweet?'':'toggleSeat(this)' ?>">
-            🛋 J9-10
-          </div>
-          <?php $col += 2; continue; endif; ?>
-
-          <?php if($col === 5): ?><div class="aisle"></div><?php endif; ?>
-          <div class="seat <?= $isVip?'vip':'' ?> <?= $isTaken?'taken':'' ?>"
-            data-seat="<?= $seatKey ?>"
-            data-type="<?= $isVip?'vip':'standard' ?>"
-            data-price="<?= $isVip ? round($show['price']*1.3) : $show['price'] ?>"
-            onclick="<?= $isTaken?'':'toggleSeat(this)' ?>">
-            <?= $col ?>
-          </div>
-          <?php $col++; endwhile; ?>
-        <div class="row-label"><?= $rowLetter ?></div>
-      </div>
-      <?php endforeach; ?>
-    </div>
+    <div class="seat-grid" id="seat-grid"></div>
   </div>
 
-  <!-- ORDER PANEL -->
   <div class="panel">
     <div class="panel-head">
       <h3><i class="fa-solid fa-ticket"></i> Thông tin đặt vé</h3>
       <p>Chọn ghế để tiếp tục</p>
     </div>
-    <div class="movie-info">
-      <?php if($show['poster_url']): ?>
-      <img class="m-poster" src="<?= htmlspecialchars($show['poster_url']) ?>" alt="">
-      <?php else: ?>
-      <div class="m-poster-ph"><i class="fa-solid fa-film"></i></div>
-      <?php endif; ?>
-      <div class="m-info">
-        <div class="m-title"><?= htmlspecialchars($show['title']) ?></div>
-        <div class="m-meta">
-          📅 <?= date('d/m/Y', strtotime($show['show_date'])) ?><br>
-          ⏰ <?= substr($show['start_time'],0,5) ?> – <?= $show['end_time'] ? substr($show['end_time'],0,5) : '—' ?><br>
-          🎬 <?= $show['format'] ?> · <?= $show['subtitle_type'] ?> · <?= htmlspecialchars($show['hall_name'] ?? 'Phòng chiếu 1') ?><br>
-          📍 <?= htmlspecialchars($show['cinema_name']) ?>
-        </div>
-      </div>
-    </div>
+    <div class="movie-info" id="movie-info"></div>
     <div class="order-body">
       <div class="ticket-count">
         <span class="tc-label">Số vé đã chọn</span>
-        <div class="tc-ctrl" style="font-weight: 800; font-size: 16px; color: var(--blue);">
-          <span class="tc-val" id="qty">0</span> vé
-        </div>
+        <div style="font-weight:800;font-size:16px;color:var(--blue)"><span id="qty">0</span> vé</div>
       </div>
-
-      <div class="order-row">
-        <span class="order-label">Ghế đã chọn</span>
-      </div>
-      <div class="seats-chosen" id="seats-chosen">
-        <span style="color:var(--muted);font-size:13px">Chưa chọn ghế</span>
-      </div>
-
+      <div class="order-row"><span class="order-label">Ghế đã chọn</span></div>
+      <div class="seats-chosen" id="seats-chosen"><span style="color:var(--muted);font-size:13px">Chưa chọn ghế</span></div>
       <div class="divider"></div>
-
-      <div class="order-row">
-        <span class="order-label">Đơn giá</span>
-        <span class="order-val" id="unit-price">—</span>
-      </div>
-      <div class="order-row">
-        <span class="order-label">Số ghế</span>
-        <span class="order-val" id="seat-count">0 ghế</span>
-      </div>
-
+      <div class="order-row"><span class="order-label">Đơn giá</span><span class="order-val" id="unit-price">—</span></div>
+      <div class="order-row"><span class="order-label">Số ghế</span><span class="order-val" id="seat-count">0 ghế</span></div>
       <div class="divider"></div>
-
-      <div class="total-row">
-        <span>Tổng cộng</span>
-        <span class="total-price" id="total-price">0 ₫</span>
-      </div>
-
+      <div class="total-row"><span>Tổng cộng</span><span class="total-price" id="total-price">0 ₫</span></div>
       <button class="btn-continue" id="btn-continue" disabled onclick="goCheckout()">
         <i class="fa-solid fa-arrow-right"></i> Tiếp tục thanh toán
       </button>
@@ -285,8 +170,21 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 </div>
 
 <script>
+const SHOWTIME_ID = <?= $showtime_id ?>;
+const API = '/be/api.php';
 const MAX_SEATS = 8;
-let selectedSeats = []; // [{seat, type, price}]
+const VIP_ROWS = ['E','F','G'];
+const ROWS = ['A','B','C','D','E','F','G','H','I','J'];
+const COLS = 10;
+
+let selectedSeats = [];
+let showData = null;
+let basePrice = 0;
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
 function showToast(title, desc) {
   const container = document.getElementById('toast-container');
@@ -297,33 +195,83 @@ function showToast(title, desc) {
     <div class="toast-content">
       <div class="toast-title">${title}</div>
       <div class="toast-desc">${desc}</div>
-    </div>
-  `;
+    </div>`;
   container.appendChild(toast);
-  
-  // Trigger animation
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      toast.classList.add('show');
-    });
-  });
-  
-  // Remove after 3s
-  setTimeout(() => {
-    toast.classList.remove('show');
-    setTimeout(() => toast.remove(), 400);
-  }, 3500);
+  requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.add('show')));
+  setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 400); }, 3500);
 }
 
+// ── RENDER SEAT MAP ───────────────────────────────────────────────────────
+function buildSeatMap(bookedSeats) {
+  const takenSet = new Set(bookedSeats);
+  let html = '';
+
+  ROWS.forEach(rowLetter => {
+    const isVip = VIP_ROWS.includes(rowLetter);
+    const isLastRow = rowLetter === 'J';
+    html += `<div class="seat-row"><div class="row-label">${rowLetter}</div>`;
+
+    let col = 1;
+    while (col <= COLS) {
+      const seatKey = `${rowLetter}-${String(col).padStart(2,'0')}`;
+
+      // Sweetbox pair: last row J, cols 9-10
+      if (isLastRow && col === 9) {
+        const sk2 = `${rowLetter}-10`;
+        const takenSweet = takenSet.has(seatKey) || takenSet.has(sk2);
+        html += `<div class="seat sweet ${takenSweet?'taken':''}"
+          data-seat="${seatKey}" data-seat2="${sk2}"
+          data-type="sweetbox" data-price="${basePrice * 2}"
+          onclick="${takenSweet?'':'toggleSeat(this)'}">🛋 J9-10</div>`;
+        col += 2;
+        continue;
+      }
+
+      if (col === 5) html += `<div class="aisle"></div>`;
+      const isTaken = takenSet.has(seatKey);
+      const seatPrice = isVip ? Math.round(basePrice * 1.3) : basePrice;
+      html += `<div class="seat ${isVip?'vip':''} ${isTaken?'taken':''}"
+        data-seat="${seatKey}" data-type="${isVip?'vip':'standard'}"
+        data-price="${seatPrice}"
+        onclick="${isTaken?'':'toggleSeat(this)'}">${col}</div>`;
+      col++;
+    }
+
+    html += `<div class="row-label">${rowLetter}</div></div>`;
+  });
+
+  document.getElementById('seat-grid').innerHTML = html;
+}
+
+function renderMovieInfo(show) {
+  const poster = show.poster_url
+    ? `<img class="m-poster" src="${escHtml(show.poster_url)}" alt="">`
+    : `<div class="m-poster-ph"><i class="fa-solid fa-film"></i></div>`;
+  const showDate = new Date(show.show_date + 'T00:00:00').toLocaleDateString('vi-VN');
+  const startTime = show.start_time.substring(0,5);
+  const endTime = show.end_time ? show.end_time.substring(0,5) : '—';
+  document.getElementById('movie-info').innerHTML = `
+    ${poster}
+    <div class="m-info">
+      <div class="m-title">${escHtml(show.title)}</div>
+      <div class="m-meta">
+        📅 ${showDate}<br>
+        ⏰ ${startTime} – ${endTime}<br>
+        🎬 ${escHtml(show.format)} · ${escHtml(show.subtitle_type)} · ${escHtml(show.hall_name||'Phòng chiếu 1')}<br>
+        📍 ${escHtml(show.cinema_name)}
+      </div>
+    </div>`;
+}
+
+// ── SEAT TOGGLE ───────────────────────────────────────────────────────────
 function toggleSeat(el) {
-  const seat  = el.dataset.seat;
+  const seat = el.dataset.seat;
   const seat2 = el.dataset.seat2 || null;
-  const type  = el.dataset.type;
+  const type = el.dataset.type;
   const price = parseInt(el.dataset.price);
 
   const idx = selectedSeats.findIndex(s => s.seat === seat);
   if (idx > -1) {
-    // deselect
     selectedSeats.splice(idx, 1);
     el.classList.remove('selected');
   } else {
@@ -341,11 +289,11 @@ function toggleSeat(el) {
 
 function updatePanel() {
   const chosen = document.getElementById('seats-chosen');
-  const total  = document.getElementById('total-price');
-  const cnt    = document.getElementById('seat-count');
+  const total = document.getElementById('total-price');
+  const cnt = document.getElementById('seat-count');
   const uPrice = document.getElementById('unit-price');
-  const btn    = document.getElementById('btn-continue');
-  const qtyEl  = document.getElementById('qty');
+  const btn = document.getElementById('btn-continue');
+  const qtyEl = document.getElementById('qty');
 
   if (!selectedSeats.length) {
     chosen.innerHTML = '<span style="color:var(--muted);font-size:13px">Chưa chọn ghế</span>';
@@ -366,7 +314,7 @@ function updatePanel() {
   });
   chosen.innerHTML = html;
   cnt.textContent = seatQty + ' ghế';
-  uPrice.textContent = selectedSeats.length ? Number(selectedSeats[0].price).toLocaleString('vi-VN') + '₫' : '—';
+  uPrice.textContent = Number(selectedSeats[0].price).toLocaleString('vi-VN') + '₫';
   total.textContent = sum.toLocaleString('vi-VN') + ' ₫';
   btn.disabled = false;
   if (qtyEl) qtyEl.textContent = seatQty;
@@ -375,9 +323,43 @@ function updatePanel() {
 function goCheckout() {
   if (!selectedSeats.length) return;
   const seats = selectedSeats.map(s => s.seat2 ? s.seat + ',' + s.seat2 : s.seat).join('|');
-  const total = selectedSeats.reduce((a,s) => a+s.price, 0);
-  window.location.href = 'checkout.php?showtime_id=<?= $showtime_id ?>&seats=' + encodeURIComponent(seats) + '&total=' + total;
+  const total = selectedSeats.reduce((a,s) => a + s.price, 0);
+  window.location.href = `checkout.php?showtime_id=${SHOWTIME_ID}&seats=${encodeURIComponent(seats)}&total=${total}`;
 }
+
+// ── LOAD DATA ─────────────────────────────────────────────────────────────
+async function loadSeatData() {
+  document.getElementById('loading-overlay').classList.remove('hidden');
+  try {
+    const res = await fetch(`${API}?action=seat_selection&showtime_id=${SHOWTIME_ID}`);
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message);
+
+    const { show, bookedSeats } = data.data;
+    showData = show;
+    basePrice = parseInt(show.price);
+
+    document.title = `Chọn ghế - ${show.title} - MovieFlex`;
+    const backBtn = document.querySelector('.back-btn');
+    if (backBtn) backBtn.href = `movie-detail.php?id=${show.movie_id}`;
+
+    renderMovieInfo(show);
+    buildSeatMap(bookedSeats);
+    document.getElementById('main-layout').style.display = 'grid';
+  } catch(err) {
+    document.body.innerHTML += `
+      <div style="max-width:500px;margin:60px auto;text-align:center;padding:32px">
+        <i class="fa-solid fa-circle-exclamation" style="font-size:48px;color:#EF4444;margin-bottom:16px;display:block"></i>
+        <h2 style="font-size:18px;font-weight:700;margin-bottom:8px">Không thể tải sơ đồ ghế</h2>
+        <p style="color:#64748B;margin-bottom:20px">${escHtml(err.message)}</p>
+        <a href="home.php" style="background:var(--blue);color:#fff;padding:10px 24px;border-radius:10px;font-weight:700;text-decoration:none">Về trang chủ</a>
+      </div>`;
+  } finally {
+    document.getElementById('loading-overlay').classList.add('hidden');
+  }
+}
+
+loadSeatData();
 </script>
 </body>
 </html>

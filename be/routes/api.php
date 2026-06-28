@@ -14,11 +14,23 @@
 require_once BASE_PATH . '/be/models/User.php';
 require_once BASE_PATH . '/be/services/AuthService.php';
 require_once BASE_PATH . '/be/services/UserService.php';
+require_once BASE_PATH . '/be/services/MovieService.php';
+require_once BASE_PATH . '/be/services/CinemaService.php';
+require_once BASE_PATH . '/be/services/BookingService.php';
+require_once BASE_PATH . '/be/services/VoucherService.php';
 require_once BASE_PATH . '/be/controllers/AuthController.php';
 require_once BASE_PATH . '/be/controllers/UserController.php';
+require_once BASE_PATH . '/be/controllers/MovieController.php';
+require_once BASE_PATH . '/be/controllers/CinemaController.php';
+require_once BASE_PATH . '/be/controllers/BookingController.php';
+require_once BASE_PATH . '/be/controllers/VoucherController.php';
 
-$authController = new AuthController($pdo);
-$userController = new UserController($pdo);
+$authController    = new AuthController($pdo);
+$userController    = new UserController($pdo);
+$movieController   = new MovieController($pdo);
+$cinemaController  = new CinemaController($pdo);
+$bookingController = new BookingController($pdo);
+$voucherController = new VoucherController($pdo);
 
 // ── AUTH (public) ──────────────────────────────────────────────────────────
 
@@ -44,3 +56,27 @@ $router->post('cancel_booking',       [$userController, 'cancelBooking'],      [
 $router->post('submit_review',        [$userController, 'submitReview'],       [$auth]);
 $router->post('my_vouchers',          [$userController, 'myVouchers'],         [$auth]);
 $router->post('submit_support_ticket',[$userController, 'submitSupportTicket'],[$auth]);
+
+// ── MOVIES ────────────────────────────────────────────────────────────────
+
+$router->any('movies_by_status',     [$movieController, 'listByStatus']);
+$router->get('movie_detail',          [$movieController, 'detail']);
+
+// ── CINEMAS ─────────────────────────────────────────────────────────────
+
+$router->any('cinemas_list',         [$cinemaController, 'list']);
+$router->any('cinema_showtimes',     [$cinemaController, 'showtimes']);
+
+// ── BOOKING ───────────────────────────────────────────────────────────────
+
+$router->get('checkout_data',         [$bookingController, 'checkoutData'],    [$auth]);
+$router->post('create_booking',       [$bookingController, 'createBooking'],   [$auth]);
+$router->post('validate_voucher',     [$bookingController, 'validateVoucher'], [$auth]);
+$router->get('booking_confirm',       [$bookingController, 'bookingConfirm'],  [$auth]);
+$router->get('seat_selection',        [$bookingController, 'seatSelectionData']);
+
+// ── VOUCHER ────────────────────────────────────────────────────────────────
+
+$router->post('voucher_dashboard',    [$voucherController, 'dashboard'],       [$auth]);
+$router->post('redeem_reward',        [$voucherController, 'redeem'],          [$auth]);
+$router->post('my_vouchers',          [$voucherController, 'myVouchers'],      [$auth]);
