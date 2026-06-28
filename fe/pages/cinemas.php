@@ -14,7 +14,7 @@ session_start();
 html,body{margin:0;padding:0;height:100%;overflow:hidden}
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --blue:#2563EB;--blue-h:#1D4ED8;
+  --blue:#DF1730;
   --sb:#0F172A;--sbw:240px;
   --bg:#F1F5F9;--card:#fff;
   --text:#0F172A;--muted:#64748B;--light:#94A3B8;--border:#E2E8F0;
@@ -135,7 +135,6 @@ function formatDateTab(dateStr) {
   return { dayName, display: `${dd}/${mm}`, isToday: d.getTime()===today.getTime(), isTomorrow: d.getTime()===tomorrow.getTime() };
 }
 
-// ── LOAD CINEMAS ──────────────────────────────────────────────────────────
 async function loadCinemas() {
   try {
     const res = await fetch(`${API}?action=cinemas_list`);
@@ -159,13 +158,11 @@ function renderCinemaList() {
     </div>`).join('');
 }
 
-// ── SELECT CINEMA ─────────────────────────────────────────────────────────
 async function selectCinema(id) {
   currentCinemaId = id;
   currentDate = null;
   groupedShowtimes = {};
 
-  // update active state in list
   document.querySelectorAll('.cl-item').forEach(el => {
     el.classList.toggle('active', el.id === `cl-${id}`);
   });
@@ -173,7 +170,6 @@ async function selectCinema(id) {
   const cinema = allCinemas.find(c => c.id == id);
   if (!cinema) return;
 
-  // show loading in right panel
   document.getElementById('st-view').innerHTML = `
     <div class="st-header">
       <h2 class="st-title"><i class="fa-solid fa-camera-movie" style="color:var(--blue)"></i> ${escHtml(cinema.name)}</h2>
@@ -205,7 +201,6 @@ async function selectCinema(id) {
   }
 }
 
-// ── RENDER RIGHT PANEL ────────────────────────────────────────────────────
 function renderShowtimePanel(cinema, dates) {
   const stView = document.getElementById('st-view');
 
@@ -226,7 +221,6 @@ function renderShowtimePanel(cinema, dates) {
     return;
   }
 
-  // Date tabs
   const dateTabs = dates.map(d => {
     const f = formatDateTab(d);
     return `<div class="date-tab ${d===currentDate?'active':''}" onclick="selectDate('${d}')"
