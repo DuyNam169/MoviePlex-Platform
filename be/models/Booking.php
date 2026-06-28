@@ -16,7 +16,7 @@ class Booking
                     u.full_name AS user_name, u.email AS user_email, u.phone AS user_phone,
                     m.title AS movie_title, m.poster_url, m.duration_min,
                     s.show_date, s.start_time, s.end_time, s.format, s.subtitle_type,
-                    s.hall_name, c.name AS cinema_name, c.address AS cinema_address
+                    s.hall_name, c.name AS cinema_name, c.address AS cinema_address, c.phone AS cinema_phone
              FROM bookings b
              JOIN users u ON u.id = b.user_id
              JOIN showtimes s ON s.id = b.showtime_id
@@ -36,7 +36,7 @@ class Booking
                     u.full_name AS user_name, u.email AS user_email,
                     m.title AS movie_title, m.poster_url, m.duration_min,
                     s.show_date, s.start_time, s.end_time, s.format, s.subtitle_type,
-                    s.hall_name, c.name AS cinema_name, c.address AS cinema_address
+                    s.hall_name, c.name AS cinema_name, c.address AS cinema_address, c.phone AS cinema_phone
              FROM bookings b
              JOIN users u ON u.id = b.user_id
              JOIN showtimes s ON s.id = b.showtime_id
@@ -146,11 +146,11 @@ class Booking
             'INSERT INTO bookings
                 (booking_code, user_id, showtime_id, seats_json, num_tickets,
                  subtotal, discount, total_amount, payment_method, payment_status,
-                 status, voucher_code)
+                 status, voucher_code, transaction_id)
              VALUES
                 (:booking_code, :user_id, :showtime_id, :seats_json, :num_tickets,
                  :subtotal, :discount, :total_amount, :payment_method, :payment_status,
-                 :status, :voucher_code)'
+                 :status, :voucher_code, :transaction_id)'
         );
         $stmt->execute([
             ':booking_code'    => $data['booking_code'],
@@ -165,6 +165,7 @@ class Booking
             ':payment_status'  => $data['payment_status'] ?? 'pending',
             ':status'          => $data['status'] ?? 'confirmed',
             ':voucher_code'    => $data['voucher_code'] ?? null,
+            ':transaction_id'  => $data['transaction_id'] ?? null,
         ]);
         return (int) $this->pdo->lastInsertId();
     }

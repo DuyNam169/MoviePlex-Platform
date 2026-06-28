@@ -1,226 +1,17 @@
 <?php
 session_start();
 if (empty($_SESSION['user_id'])) { header('Location: login.php'); exit; }
-require_once __DIR__ . '/../../be/config/db.php';
-
-$showtime_id = (int)($_GET['showtime_id'] ?? 0);
-$seatsParam  = $_GET['seats'] ?? '';
-$clientTotal = (int)($_GET['total'] ?? 0);
-if (!$showtime_id || !$seatsParam) { header('Location: home.php'); exit; }
-
-// Parse seats
-$seatGroups = explode('|', $seatsParam);
-$allSeats = [];
-foreach ($seatGroups as $g) {
-    foreach (explode(',', $g) as $s) {
-        if (trim($s)) $allSeats[] = trim($s);
-    }
-}
-
-$show = $pdo->prepare("
-  SELECT s.*, m.title, m.duration_min, m.poster_url, m.age_rating, m.id as movie_id,
-         c.name as cinema_name
-  FROM showtimes s
-  JOIN movies m ON s.movie_id = m.id
-  JOIN cinemas c ON s.cinema_id = c.id
-  WHERE s.id = ? LIMIT 1
-");
-$show->execute([$showtime_id]);
-$show = $show->fetch();
-if (!$show) { header('Location: home.php'); exit; }
-
-// Chặn thanh toán nếu suất chiếu đã bị hủy hoặc bắt đầu quá 20 phút
-if ($show['is_cancelled'] == 1) {
-    header('Location: home.php');
-    exit;
-}
-
-$showtime_dt = strtotime($show['show_date'] . ' ' . $show['start_time']);
-if ($showtime_dt + 20 * 60 < time()) {
-    header('Location: home.php');
-    exit;
-}
-
-// Vouchers
-$vQuery = $pdo->prepare("
-  SELECT v.* 
-  FROM vouchers v
-  WHERE v.is_active=1 
-    AND (v.expire_date IS NULL OR v.expire_date >= CURDATE())
-    AND v.user_id = ? 
-    AND v.used_count < v.max_uses
-  LIMIT 20
-");
-$vQuery->execute([$_SESSION['user_id']]);
-$vouchers = $vQuery->fetchAll();
-
-// Snacks
-$snacks = $pdo->query("SELECT * FROM snacks ORDER BY category, price")->fetchAll();
-
-// Server-side price recalc
-$vipRows = ['E','F','G'];
-$basePrice = $show['price'];
-$serverTotal = 0;
-foreach ($seatGroups as $g) {
-    $parts = explode(',', $g);
-    $row = substr(trim($parts[0]),0,1);
-    if (count($parts) === 2) { // sweetbox
-        $serverTotal += $basePrice * 2;
-    } elseif (in_array($row, $vipRows)) {
-        $serverTotal += round($basePrice * 1.3);
-    } else {
-        $serverTotal += $basePrice;
-    }
-}
-
-// POST: process booking
-$error = ''; $success = false;
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $voucherCode  = trim($_POST['voucher_code'] ?? '');
-    $payMethod    = $_POST['payment_method'] ?? 'momo';
-    $snacksJson   = $_POST['snacks_json'] ?? '[]';
-    $snacksTotal  = (int)($_POST['snacks_total'] ?? 0);
-
-    $discount = 0;
-    if ($voucherCode) {
-        $v = $pdo->prepare("
-          SELECT * FROM vouchers 
-          WHERE code=? 
-            AND is_active=1 
-            AND (expire_date IS NULL OR expire_date>=CURDATE()) 
-            AND used_count<max_uses 
-            AND user_id=?
-          LIMIT 1
-        ");
-        $v->execute([$voucherCode, $_SESSION['user_id']]);
-        $voucher = $v->fetch();
-        if ($voucher) {
-            // Check if the master template for this voucher is active
-            $parts = explode('-', $voucherCode);
-            $prefix = $parts[0];
-            $parent = $pdo->prepare("SELECT is_active FROM vouchers WHERE code = ? AND user_id IS NULL LIMIT 1");
-            $parent->execute([$prefix]);
-            $parentActive = $parent->fetch();
-            
-            if ($parentActive && $parentActive['is_active'] == 0) {
-                $error = 'Mã voucher này đã hết hạn hoặc tạm dừng áp dụng.';
-            } else {
-                // Check if current user has already used this voucher
-                $used = $pdo->prepare("SELECT COUNT(*) FROM bookings WHERE user_id=? AND voucher_code=? AND status!='cancelled'");
-                $used->execute([$_SESSION['user_id'], $voucherCode]);
-                if ($used->fetchColumn() > 0) {
-                    $error = 'Bạn đã sử dụng mã voucher này cho một giao dịch trước đó.';
-                } else {
-                    // GIFTPOP = voucher đổi điểm, chỉ giảm tiền bắp nước, KHÔNG giảm tiền vé
-                    $isSnackVoucher = str_starts_with(strtoupper($voucherCode), 'GIFTPOP');
-                    if ($isSnackVoucher) {
-                        // Chỉ giảm tối đa bằng snacksTotal, không được giảm tiền vé
-                        $discount = min((int)$voucher['discount_amt'], max(0, $snacksTotal));
-                    } elseif ($voucher['discount_pct']) {
-                        // Kiểm tra đơn tối thiểu
-                        if ($serverTotal + $snacksTotal >= $voucher['min_order']) {
-                            $discount = round(($serverTotal + $snacksTotal) * $voucher['discount_pct'] / 100);
-                        } else {
-                            $error = 'Đơn hàng chưa đạt giá trị tối thiểu để áp dụng mã này.';
-                        }
-                    } elseif ($voucher['discount_amt']) {
-                        $discount = min((int)$voucher['discount_amt'], $serverTotal + $snacksTotal);
-                    }
-                }
-            }
-        } else {
-            $error = 'Mã voucher không hợp lệ, đã hết lượt dùng hoặc đã hết hạn.';
-        }
-    }
-
-    if (!$error) {
-        $transaction_id = 'TX-' . date('Ymd') . strtoupper(substr(uniqid(), -6));
-        $first_booking_code = null;
-        $accumulated_discount = 0;
-        $n = count($seatGroups);
-
-        try {
-            $pdo->beginTransaction();
-
-            $ins = $pdo->prepare("
-                INSERT INTO bookings (
-                    booking_code, user_id, showtime_id, seats_json, num_tickets, 
-                    subtotal, discount, total_amount, payment_method, 
-                    payment_status, status, voucher_code, transaction_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', 'confirmed', ?, ?)
-            ");
-
-            foreach ($seatGroups as $idx => $g) {
-                $parts = explode(',', $g);
-                $clean_parts = array_map('trim', $parts);
-                $row = substr($clean_parts[0], 0, 1);
-                
-                if (count($clean_parts) === 2) { // sweetbox couple seat
-                    $seat_subtotal = $basePrice * 2;
-                    $ticket_count = 2;
-                } elseif (in_array($row, $vipRows)) {
-                    $seat_subtotal = round($basePrice * 1.3);
-                    $ticket_count = 1;
-                } else {
-                    $seat_subtotal = $basePrice;
-                    $ticket_count = 1;
-                }
-
-                // Proportional discount allocation
-                if ($idx === $n - 1) {
-                    $seat_discount = $discount - $accumulated_discount;
-                } else {
-                    $seat_discount = round($discount * ($seat_subtotal / $serverTotal));
-                }
-                $accumulated_discount += $seat_discount;
-
-                // Add snacks total to first ticket
-                $seat_total = $seat_subtotal - $seat_discount;
-                if ($idx === 0) {
-                    $seat_total += $snacksTotal;
-                }
-                $seat_total = max(0, $seat_total);
-
-                $code = 'MF' . date('Ymd') . strtoupper(substr(md5(uniqid(microtime(), true)), -6));
-                if ($idx === 0) {
-                    $first_booking_code = $code;
-                }
-
-                $ins->execute([
-                    $code,
-                    $_SESSION['user_id'],
-                    $showtime_id,
-                    json_encode($clean_parts),
-                    $ticket_count,
-                    $seat_subtotal,
-                    $seat_discount,
-                    $seat_total,
-                    $payMethod,
-                    $voucherCode ?: null,
-                    $transaction_id
-                ]);
-            }
-
-            // Update showtimes available seats
-            $pdo->prepare("UPDATE showtimes SET available_seats = available_seats - ? WHERE id=?")->execute([count($allSeats), $showtime_id]);
-            
-            if ($voucherCode && isset($voucher)) {
-                $pdo->prepare("UPDATE vouchers SET used_count=used_count+1 WHERE code=?")->execute([$voucherCode]);
-            }
-
-            $pdo->commit();
-            header("Location: booking-confirm.php?code=$first_booking_code"); exit;
-        } catch (Exception $e) {
-            $pdo->rollBack();
-            $error = 'Đặt vé thất bại. Vui lòng thử lại. Lỗi: ' . $e->getMessage();
-        }
-    }
-}
+$showtimeId = (int)($_GET['showtime_id'] ?? 0);
+$seatsParam = trim($_GET['seats'] ?? '');
+if ($showtimeId <= 0 || $seatsParam === '') { header('Location: home.php'); exit; }
+$seatsParamEscaped = htmlspecialchars($seatsParam, ENT_QUOTES, 'UTF-8');
+$showtimeIdEscaped = $showtimeId;
 ?>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Thanh toán - MovieFlex</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -234,7 +25,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .logo-name{font-size:16px;font-weight:800;color:var(--blue)}
 .step-bar{display:flex;align-items:center;gap:0;flex:1;justify-content:center}
 .step{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--muted)}
-.step.active{color:var(--blue)}.step.done{color:var(--green)}
+.step.active{color:var(--blue)}
+.step.done{color:var(--green)}
 .step-num{width:24px;height:24px;border-radius:50%;border:2px solid currentColor;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
 .step.done .step-num{background:var(--green);border-color:var(--green);color:#fff}
 .step.active .step-num{background:var(--blue);border-color:var(--blue);color:#fff}
@@ -246,7 +38,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .card-head h3{font-size:15px;font-weight:700}
 .card-head .icon{width:32px;height:32px;border-radius:8px;background:#FAF0F1;color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:14px}
 .card-body{padding:18px 20px}
-/* ORDER SUMMARY */
 .order-movie{display:flex;gap:14px;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)}
 .op{width:60px;height:85px;border-radius:9px;object-fit:cover;flex-shrink:0;background:#e2e8f0}
 .op-ph{width:60px;height:85px;border-radius:9px;flex-shrink:0;background:#1e293b;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.2);font-size:20px}
@@ -254,7 +45,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .om-meta{font-size:13px;color:var(--muted);line-height:1.7}
 .seats-row{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
 .seat-tag{background:#FAF0F1;color:var(--blue);font-size:12px;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid #FCA5A5}
-/* SNACKS */
 .snack-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .snack-card{border:1.5px solid var(--border);border-radius:10px;padding:12px;cursor:pointer;transition:all .2s;position:relative}
 .snack-card:hover{border-color:var(--blue)}
@@ -262,7 +52,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .snack-card.selected::after{content:'✓';position:absolute;top:8px;right:10px;color:var(--blue);font-weight:800;font-size:13px}
 .snack-name{font-size:13px;font-weight:600;margin-bottom:3px}
 .snack-price{font-size:13px;font-weight:700;color:var(--blue)}
-/* VOUCHER */
 .voucher-row{display:flex;gap:8px}
 .voucher-input{flex:1;height:42px;border:1.5px solid var(--border);border-radius:10px;padding:0 14px;font-size:14px;font-family:inherit;outline:none;transition:border-color .2s}
 .voucher-input:focus{border-color:var(--blue)}
@@ -272,14 +61,12 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .vtag{padding:4px 10px;border-radius:6px;border:1.5px dashed var(--border);font-size:12px;font-weight:600;cursor:pointer;color:var(--muted);transition:all .2s}
 .vtag:hover{border-color:var(--blue);color:var(--blue)}
 .vtag.applied{border-color:var(--green);color:var(--green);background:#F0FDF4}
-/* PAYMENT */
 .pay-methods{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .pay-opt{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;cursor:pointer;transition:all .2s}
 .pay-opt.selected,.pay-opt:hover{border-color:var(--blue)}
 .pay-opt input[type=radio]{accent-color:var(--blue)}
 .pay-icon{width:32px;height:32px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:16px}
 .pay-name{font-size:13.5px;font-weight:600}
-/* SUMMARY */
 .sum-section{position:sticky;top:76px}
 .sum-rows{padding:16px 20px}
 .sum-row{display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:10px}
@@ -293,10 +80,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .btn-pay:hover{background:#1D4ED8}
 .alert-err{background:#FEF2F2;color:#B91C1C;border:1px solid #FECACA;border-radius:10px;padding:12px 16px;font-size:13.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px}
 .info-note{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px;margin-top:10px}
+.hidden{display:none}
 </style>
 </head>
 <body>
-
 <div class="topbar">
   <a href="home.php" class="logo"><div class="logo-icon"><i class="fa-solid fa-clapperboard"></i></div><span class="logo-name">MovieFlex</span></a>
   <div class="step-bar">
@@ -312,71 +99,42 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 
 <div class="layout">
   <div>
-    <?php if($error): ?>
-    <div class="alert-err"><i class="fa-solid fa-circle-exclamation"></i><?= htmlspecialchars($error) ?></div>
-    <?php endif; ?>
+    <div id="error-panel" class="alert-err hidden"><i class="fa-solid fa-circle-exclamation"></i><span id="error-text"></span></div>
 
-    <!-- TÓM TẮT ĐƠN -->
     <div class="card">
       <div class="card-head"><div class="icon"><i class="fa-solid fa-film"></i></div><h3>Tóm tắt đặt vé</h3></div>
-      <div class="card-body">
+      <div class="card-body" id="order-summary">
         <div class="order-movie">
-          <?php if($show['poster_url']): ?>
-          <img class="op" src="<?= htmlspecialchars($show['poster_url']) ?>" alt="">
-          <?php else: ?><div class="op-ph"><i class="fa-solid fa-film"></i></div><?php endif; ?>
+          <div id="poster-container"></div>
           <div class="om-info">
-            <h4><?= htmlspecialchars($show['title']) ?></h4>
-            <div class="om-meta">
-              📅 <?= date('d/m/Y', strtotime($show['show_date'])) ?><br>
-              ⏰ <?= substr($show['start_time'],0,5) ?> &nbsp;·&nbsp; <?= $show['format'] ?> · <?= $show['subtitle_type'] ?> · <?= htmlspecialchars($show['hall_name'] ?? 'Phòng chiếu 1') ?><br>
-              📍 <?= htmlspecialchars($show['cinema_name']) ?>
-            </div>
+            <h4 id="movie-title">Đang tải...</h4>
+            <div class="om-meta" id="movie-meta"></div>
           </div>
         </div>
         <div style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px">Ghế đã chọn:</div>
-        <div class="seats-row">
-          <?php foreach($allSeats as $s): ?>
-          <span class="seat-tag"><?= htmlspecialchars($s) ?></span>
-          <?php endforeach; ?>
-        </div>
+        <div class="seats-row" id="selected-seats"></div>
       </div>
     </div>
 
-    <!-- SNACKS -->
     <div class="card">
       <div class="card-head"><div class="icon"><i class="fa-solid fa-popcorn"></i></div><h3>Thêm bắp nước (tuỳ chọn)</h3></div>
       <div class="card-body">
-        <div class="snack-grid" id="snack-grid">
-          <?php foreach($snacks as $sn): ?>
-          <div class="snack-card" data-id="<?= $sn['id'] ?>" data-price="<?= $sn['price'] ?>" data-name="<?= htmlspecialchars($sn['name']) ?>" onclick="toggleSnack(this)">
-            <div class="snack-name"><?= htmlspecialchars($sn['name']) ?></div>
-            <div class="snack-price"><?= number_format($sn['price'],0,',','.') ?>₫</div>
-          </div>
-          <?php endforeach; ?>
-        </div>
+        <div class="snack-grid" id="snack-grid"></div>
       </div>
     </div>
 
-    <!-- VOUCHER -->
     <div class="card">
       <div class="card-head"><div class="icon"><i class="fa-solid fa-tag"></i></div><h3>Mã giảm giá</h3></div>
       <div class="card-body">
         <div class="voucher-row">
           <input class="voucher-input" type="text" id="voucher-input" placeholder="Nhập mã voucher..." maxlength="30">
-          <button class="btn-apply" onclick="applyVoucher()">Áp dụng</button>
+          <button class="btn-apply" type="button" id="apply-voucher-btn">Áp dụng</button>
         </div>
-        <div class="voucher-tags" id="voucher-tags">
-          <?php foreach($vouchers as $v): ?>
-          <span class="vtag" data-code="<?= htmlspecialchars($v['code']) ?>" onclick="pickVoucher(this)">
-            <?= htmlspecialchars($v['code']) ?> - <?= $v['description'] ?>
-          </span>
-          <?php endforeach; ?>
-        </div>
+        <div class="voucher-tags" id="voucher-tags"></div>
         <div id="voucher-msg" style="font-size:13px;margin-top:8px"></div>
       </div>
     </div>
 
-    <!-- THANH TOÁN -->
     <div class="card">
       <div class="card-head"><div class="icon"><i class="fa-solid fa-credit-card"></i></div><h3>Phương thức thanh toán</h3></div>
       <div class="card-body">
@@ -391,126 +149,244 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
   </div>
 
-  <!-- SUMMARY PANEL -->
   <div class="sum-section">
     <div class="card">
       <div class="card-head"><div class="icon"><i class="fa-solid fa-receipt"></i></div><h3>Chi tiết thanh toán</h3></div>
       <div class="sum-rows">
-        <div class="sum-row"><span class="sum-label">Vé phim (<?= count($seatGroups) ?> ghế)</span><span class="sum-val" id="s-tickets"><?= number_format($serverTotal,0,',','.') ?>₫</span></div>
+        <div class="sum-row"><span class="sum-label">Vé phim (<span id="ticket-count">0</span> ghế)</span><span class="sum-val" id="s-tickets">0₫</span></div>
         <div class="sum-row"><span class="sum-label">Bắp nước</span><span class="sum-val" id="s-snacks">0₫</span></div>
         <div class="sum-row"><span class="sum-label">Mã giảm giá</span><span class="sum-val sum-discount" id="s-discount">−0₫</span></div>
         <div class="sum-divider"></div>
       </div>
-      <div class="sum-total"><span>Tổng cộng</span><span class="sum-total-price" id="s-total"><?= number_format($serverTotal,0,',','.') ?>₫</span></div>
-
-      <form method="POST" id="pay-form">
+      <div class="sum-total"><span>Tổng cộng</span><span class="sum-total-price" id="s-total">0₫</span></div>
+      <form id="pay-form">
         <input type="hidden" name="voucher_code" id="f-voucher">
         <input type="hidden" name="payment_method" id="f-method" value="momo">
         <input type="hidden" name="snacks_json" id="f-snacks" value="[]">
-        <input type="hidden" name="snacks_total" id="f-snacks-total" value="0">
-        <button type="button" class="btn-pay" onclick="submitPay()"><i class="fa-solid fa-lock"></i> Xác nhận thanh toán</button>
+        <button type="button" class="btn-pay" id="submit-pay">Xác nhận thanh toán</button>
       </form>
     </div>
   </div>
 </div>
 
 <script>
-const BASE = <?= $serverTotal ?>;
-let snacksTotal = 0, discount = 0, appliedVoucher = '';
+const showtimeId = <?= $showtimeIdEscaped ?>;
+const seatsParam = '<?= $seatsParamEscaped ?>';
+const apiBase = '/be/api.php';
+let checkoutData = null;
 let selectedSnacks = [];
+let currentVoucher = null;
+let currentDiscount = 0;
+let currentVoucherCode = '';
+let loading = false;
 
-const vouchers = <?= json_encode(array_map(fn($v)=>['code'=>$v['code'],'pct'=>$v['discount_pct'],'amt'=>$v['discount_amt'],'min'=>$v['min_order']], $vouchers)) ?>;
+function showError(message) {
+  const panel = document.getElementById('error-panel');
+  document.getElementById('error-text').textContent = message;
+  panel.classList.remove('hidden');
+}
+
+function hideError() {
+  document.getElementById('error-panel').classList.add('hidden');
+}
+
+function formatCurrency(value) {
+  return Number(value).toLocaleString('vi-VN') + '₫';
+}
+
+function setLoading(state) {
+  loading = state;
+  document.getElementById('submit-pay').disabled = state;
+  document.getElementById('apply-voucher-btn').disabled = state;
+}
+
+async function fetchJson(url, options = {}) {
+  const response = await fetch(url, options);
+  if (!response.ok) {
+    throw new Error('Lỗi kết nối máy chủ.');
+  }
+  const data = await response.json();
+  if (!data.success) {
+    throw new Error(data.message || 'Lỗi API.');
+  }
+  return data;
+}
+
+function renderCheckout() {
+  if (!checkoutData) return;
+  const show = checkoutData.show;
+  const allSeats = checkoutData.allSeats;
+  const snacks = checkoutData.snacks;
+  const vouchers = checkoutData.vouchers;
+  const pricing = checkoutData.pricing;
+
+  document.getElementById('ticket-count').textContent = pricing.count;
+  document.getElementById('s-tickets').textContent = formatCurrency(pricing.serverTotal);
+  document.getElementById('s-snacks').textContent = formatCurrency(0);
+  document.getElementById('s-discount').textContent = '−0₫';
+  document.getElementById('s-total').textContent = formatCurrency(pricing.serverTotal);
+
+  const selectedSeats = document.getElementById('selected-seats');
+  selectedSeats.innerHTML = allSeats.map(seat => `<span class="seat-tag">${seat}</span>`).join('');
+
+  const posterContainer = document.getElementById('poster-container');
+  if (show.poster_url) {
+    posterContainer.innerHTML = `<img class="op" src="${show.poster_url}" alt="Poster">`;
+  } else {
+    posterContainer.innerHTML = '<div class="op-ph"><i class="fa-solid fa-film"></i></div>';
+  }
+
+  document.getElementById('movie-title').textContent = show.title;
+  document.getElementById('movie-meta').innerHTML = `📅 ${new Date(show.show_date).toLocaleDateString('vi-VN')}<br>⏰ ${show.start_time.slice(0,5)} · ${show.format} · ${show.subtitle_type} · ${show.hall_name || 'Phòng chiếu 1'}<br>📍 ${show.cinema_name}`;
+
+  const snackGrid = document.getElementById('snack-grid');
+  snackGrid.innerHTML = snacks.map(sn => `
+    <div class="snack-card" data-id="${sn.id}" data-price="${sn.price}" data-name="${sn.name}" onclick="toggleSnack(this)">
+      <div class="snack-name">${sn.name}</div>
+      <div class="snack-price">${formatCurrency(sn.price)}</div>
+    </div>
+  `).join('');
+
+  const voucherTags = document.getElementById('voucher-tags');
+  voucherTags.innerHTML = vouchers.map(v => `
+    <span class="vtag" data-code="${v.code}" onclick="chooseVoucher(this)">${v.code} - ${v.description}</span>
+  `).join('');
+}
+
+function updateTotal() {
+  if (!checkoutData) return;
+  const pricing = checkoutData.pricing;
+  const snacksTotal = selectedSnacks.reduce((sum, item) => sum + item.price, 0);
+  const baseTotal = pricing.serverTotal;
+  const total = Math.max(0, baseTotal + snacksTotal - currentDiscount);
+
+  document.getElementById('s-snacks').textContent = formatCurrency(snacksTotal);
+  document.getElementById('s-discount').textContent = currentDiscount > 0 ? `−${formatCurrency(currentDiscount)}` : '−0₫';
+  document.getElementById('s-total').textContent = formatCurrency(total);
+}
 
 function toggleSnack(el) {
   el.classList.toggle('selected');
-  const price = parseInt(el.dataset.price);
+  const id = parseInt(el.dataset.id, 10);
+  const price = parseInt(el.dataset.price, 10);
+  const name = el.dataset.name;
   if (el.classList.contains('selected')) {
-    snacksTotal += price;
-    selectedSnacks.push({id: el.dataset.id, name: el.dataset.name, price});
+    selectedSnacks.push({id, name, price});
   } else {
-    snacksTotal -= price;
-    selectedSnacks = selectedSnacks.filter(s => s.id !== el.dataset.id);
+    selectedSnacks = selectedSnacks.filter(s => s.id !== id);
   }
-  // Tính lại discount nếu là GIFTPOP (phụ thuộc snacksTotal)
-  if (appliedVoucher && appliedVoucher.startsWith('GIFTPOP')) reapplyVoucher();
-  updateTotal();
+  if (currentVoucherCode && currentVoucherCode.startsWith('GIFTPOP')) {
+    applyVoucher(true);
+  } else {
+    updateTotal();
+  }
 }
 
-function pickVoucher(el) {
+function chooseVoucher(el) {
   document.getElementById('voucher-input').value = el.dataset.code;
   applyVoucher();
 }
 
-function reapplyVoucher() {
-  if (!appliedVoucher) return;
-  const v = vouchers.find(x => x.code.toUpperCase() === appliedVoucher);
-  if (!v) return;
-  const isSnackOnly = appliedVoucher.startsWith('GIFTPOP');
-  if (isSnackOnly) {
-    // Chỉ giảm tối đa bằng snacksTotal
-    discount = Math.min(parseInt(v.amt) || 0, snacksTotal);
-  }
-}
-
-function applyVoucher() {
+async function applyVoucher(recalc = false) {
+  hideError();
   const code = document.getElementById('voucher-input').value.trim().toUpperCase();
-  const msg  = document.getElementById('voucher-msg');
-  if (!code) { appliedVoucher=''; discount=0; updateTotal(); msg.textContent=''; return; }
+  const message = document.getElementById('voucher-msg');
+  message.textContent = '';
+  currentDiscount = 0;
+  currentVoucher = null;
+  currentVoucherCode = '';
 
-  const v = vouchers.find(x => x.code.toUpperCase() === code);
-  const isSnackOnly = code.startsWith('GIFTPOP'); // Voucher đổi điểm = chỉ giảm bắp nước
-
-  if (!v) {
-    msg.innerHTML = '<span style="color:#ef4444">❌ Mã không hợp lệ hoặc chưa được hỗ trợ trực tiếp</span>';
-    discount = 0; appliedVoucher = '';
-  } else if (!isSnackOnly && (BASE + snacksTotal) < v.min) {
-    msg.innerHTML = `<span style="color:#ef4444">❌ Đơn tối thiểu ${Number(v.min).toLocaleString('vi-VN')}₫</span>`;
-    discount = 0; appliedVoucher = '';
-  } else if (isSnackOnly && snacksTotal === 0) {
-    // Voucher bắp nước nhưng chưa chọn bắp nước
-    msg.innerHTML = '<span style="color:#f59e0b">⚠️ Voucher này chỉ áp dụng cho bắp nước. Vui lòng chọn thêm bắp nước để sử dụng.</span>';
-    discount = 0; appliedVoucher = code;
-  } else {
-    if (isSnackOnly) {
-      // Chỉ giảm trong phạm vi snacksTotal, không chạm tiền vé
-      discount = Math.min(parseInt(v.amt) || 0, snacksTotal);
-    } else if (v.pct) {
-      discount = Math.round((BASE + snacksTotal) * v.pct / 100);
-    } else {
-      discount = Math.min(parseInt(v.amt) || 0, BASE + snacksTotal);
-    }
-    appliedVoucher = code;
-    const label = isSnackOnly ? '🍿 Miễn phí bắp nước! Giảm' : '✅ Áp dụng thành công! Giảm';
-    msg.innerHTML = `<span style="color:#22C55E">${label} ${Number(discount).toLocaleString('vi-VN')}₫</span>`;
-    document.querySelectorAll('.vtag').forEach(t => {
-      t.classList.toggle('applied', t.dataset.code.toUpperCase() === code);
-    });
+  if (!code) {
+    updateTotal();
+    return;
   }
-  updateTotal();
+
+  const snacksTotal = selectedSnacks.reduce((sum, item) => sum + item.price, 0);
+  const body = new URLSearchParams();
+  body.append('action', 'validate_voucher');
+  body.append('voucher_code', code);
+  body.append('showtime_id', showtimeId);
+  body.append('seats', seatsParam);
+  body.append('snacks_json', JSON.stringify(selectedSnacks));
+
+  try {
+    setLoading(true);
+    const data = await fetchJson(apiBase, {
+      method: 'POST',
+      headers: {'Content-Type':'application/x-www-form-urlencoded'},
+      body: body.toString(),
+    });
+    currentDiscount = parseInt(data.discount, 10) || 0;
+    currentVoucher = data.voucher || null;
+    currentVoucherCode = code;
+    message.innerHTML = `<span style="color:#22C55E">✅ ${data.message}</span>`;
+    document.querySelectorAll('.vtag').forEach(tag => {
+      tag.classList.toggle('applied', tag.dataset.code.toUpperCase() === code);
+    });
+  } catch (error) {
+    message.innerHTML = `<span style="color:#ef4444">❌ ${error.message}</span>`;
+    currentDiscount = 0;
+    currentVoucherCode = '';
+    document.querySelectorAll('.vtag').forEach(tag => tag.classList.remove('applied'));
+  } finally {
+    setLoading(false);
+    updateTotal();
+  }
 }
 
-function updateTotal() {
-  const total = Math.max(0, BASE + snacksTotal - discount);
-  document.getElementById('s-snacks').textContent = snacksTotal.toLocaleString('vi-VN') + '₫';
-  document.getElementById('s-discount').textContent = discount > 0 ? '−' + discount.toLocaleString('vi-VN') + '₫' : '−0₫';
-  document.getElementById('s-total').textContent = total.toLocaleString('vi-VN') + '₫';
+async function submitPayment() {
+  hideError();
+  if (!checkoutData) return;
+  const method = document.querySelector('input[name="pay"]:checked')?.value || 'momo';
+  const body = new URLSearchParams();
+  body.append('action', 'create_booking');
+  body.append('showtime_id', showtimeId);
+  body.append('seats', seatsParam);
+  body.append('payment_method', method);
+  body.append('voucher_code', currentVoucherCode);
+  body.append('snacks_json', JSON.stringify(selectedSnacks));
+
+  try {
+    setLoading(true);
+    const data = await fetchJson(apiBase, {
+      method: 'POST',
+      headers: {'Content-Type':'application/x-www-form-urlencoded'},
+      body: body.toString(),
+    });
+    window.location.href = `booking-confirm.php?code=${encodeURIComponent(data.booking_code)}`;
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    setLoading(false);
+  }
 }
 
-document.querySelectorAll('.pay-opt').forEach(opt => {
-  opt.addEventListener('click', function() {
-    document.querySelectorAll('.pay-opt').forEach(o => o.classList.remove('selected'));
-    this.classList.add('selected');
-    document.getElementById('f-method').value = this.querySelector('input').value;
-  });
+async function loadCheckoutData() {
+  try {
+    setLoading(true);
+    const data = await fetchJson(`${apiBase}?action=checkout_data&showtime_id=${showtimeId}&seats=${encodeURIComponent(seatsParam)}`);
+    checkoutData = data.data;
+    renderCheckout();
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+document.getElementById('apply-voucher-btn').addEventListener('click', () => applyVoucher());
+document.getElementById('submit-pay').addEventListener('click', submitPayment);
+
+document.getElementById('pay-methods').addEventListener('click', (event) => {
+  const opt = event.target.closest('.pay-opt');
+  if (!opt) return;
+  document.querySelectorAll('.pay-opt').forEach(o => o.classList.remove('selected'));
+  opt.classList.add('selected');
+  const radio = opt.querySelector('input[name="pay"]');
+  if (radio) radio.checked = true;
 });
 
-function submitPay() {
-  document.getElementById('f-voucher').value = appliedVoucher;
-  document.getElementById('f-snacks').value = JSON.stringify(selectedSnacks);
-  document.getElementById('f-snacks-total').value = snacksTotal;
-  document.getElementById('f-method').value = document.querySelector('input[name="pay"]:checked')?.value || 'momo';
-  document.getElementById('pay-form').submit();
-}
+loadCheckoutData();
 </script>
 </body>
 </html>
