@@ -83,7 +83,7 @@ MoviePlex-Platform/
 Mở CMD hoặc PowerShell trên Windows:
 
 ```cmd
-ssh us@192.168.1.45
+ssh us@<IP_MÁY_ẢO>
 ```
 
 Nhập mật khẩu khi được hỏi.
@@ -147,9 +147,9 @@ movieplex_pma   Up
 
 | Dịch vụ    | URL                          |
 | ---------- | ---------------------------- |
-| Ứng dụng   | http://192.168.1.45:8080     |
-| phpMyAdmin | http://192.168.1.45:8081     |
-| MySQL      | 192.168.1.45:3306            |
+| Ứng dụng   | http://<IP_MÁY_ẢO>:8080     |
+| phpMyAdmin | http://<IP_MÁY_ẢO>:8081     |
+| MySQL      | <IP_MÁY_ẢO>:3306            |
 
 ---
 
@@ -183,20 +183,40 @@ git push
 
 ## Cập nhật code lên SVN
 
+> ⚠️ SVN không tự đồng bộ với GitHub. Phải thực hiện thủ công sau mỗi lần push GitHub.
+
 Thực hiện trên **máy thật** (dùng command line hoặc TortoiseSVN):
 
 **Nếu đã checkout SVN rồi** (lần trước đã checkout):
 
 ```bash
-cd duong_dan_thu_muc_svn
-# Copy file vừa sửa vào thư mục SVN, rồi commit
+# Bước 1 — Khởi động Apache (bắt buộc mỗi lần dùng SVN)
+sudo systemctl start apache2
+
+# Bước 2 — Vào thư mục SVN đã checkout
+cd ~/movieplex_svn
+
+# Bước 3 — Cập nhật từ server về trước
+svn update
+
+# Bước 4 — Copy code mới từ GitHub vào thư mục SVN
+cd ~
+git clone https://github.com/DuyNam169/MoviePlex-Platform temp_new
+cp -r temp_new/* ~/movieplex_svn/
+rm -rf temp_new
+
+# Bước 5 — Xem file nào thay đổi
+cd ~/movieplex_svn
+svn status
+
+# Bước 6 — Commit lên SVN
 svn commit --username sv01 -m "Mô tả thay đổi"
 ```
 
 **Nếu chưa checkout SVN lần nào** (lần đầu):
 
 ```bash
-svn checkout http://192.168.1.45/svn/duan_phanmem/trunk ten_thu_muc --username sv01
+svn checkout http://<IP_MÁY_ẢO>/svn/duan_phanmem/trunk ten_thu_muc --username sv01
 ```
 
 > SVN **không tự động đồng bộ** với GitHub. Khi cần cập nhật SVN, phải copy file mới vào thư mục đã checkout rồi commit thủ công.
@@ -210,7 +230,7 @@ SVN và máy ảo Linux **không tự động cập nhật** khi có thay đổi
 **SSH vào máy ảo:**
 
 ```cmd
-ssh us@192.168.1.45
+ssh us@<IP_MÁY_ẢO>
 ```
 
 **Kéo code mới từ GitHub:**
@@ -266,7 +286,7 @@ docker compose up -d --build
 SFTP chạy trên nền SSH, không cần cài thêm phần mềm. Mở CMD trên máy thật:
 
 ```cmd
-sftp us@192.168.1.45
+sftp us@<IP_MÁY_ẢO>
 ```
 
 Một số lệnh trong SFTP:
@@ -286,14 +306,14 @@ exit            # thoát
 
 | Thông tin | Giá trị |
 | --------- | ------- |
-| SVN URL   | http://192.168.1.45/svn/duan_phanmem/trunk |
+| SVN URL   | http://<IP_MÁY_ẢO>/svn/duan_phanmem/trunk |
 | User sv01 | Quyền đọc/ghi toàn bộ repo |
 | User sv02 | Quyền đọc/ghi toàn bộ repo |
 
 **Checkout lần đầu (từ máy thật):**
 
 ```bash
-svn checkout http://192.168.1.45/svn/duan_phanmem/trunk movieplex_local --username sv01
+svn checkout http://<IP_MÁY_ẢO>/svn/duan_phanmem/trunk movieplex_local --username sv01
 ```
 
 **Commit code:**
@@ -309,7 +329,11 @@ svn commit --username sv01 -m "Mô tả thay đổi"
 svn update
 ```
 
-> Nếu Apache trên máy ảo bị tắt, SVN sẽ không kết nối được. SSH vào máy ảo và chạy `sudo systemctl start apache2` để khởi động lại.
+> ⚠️ Apache không tự khởi động cùng máy ảo. Trước khi dùng SVN, luôn kiểm tra và khởi động Apache:
+>
+> ```bash
+> sudo systemctl start apache2
+> ```
 
 ---
 
