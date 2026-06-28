@@ -5,143 +5,6 @@ if (empty($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
     header('Location: ../pages/login.php');
     exit;
 }
-
-require_once __DIR__ . '/../../be/config/db.php';
-
-$message = '';
-$messageType = '';
-
-// Handle CRUD operations for Cinema
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
-
-    if ($action === 'save') {
-        $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
-        $name = trim($_POST['name'] ?? '');
-        $address = trim($_POST['address'] ?? '');
-        $city = trim($_POST['city'] ?? 'Hà Nội');
-        $phone = trim($_POST['phone'] ?? '');
-        $logo_url = trim($_POST['logo_url'] ?? '');
-
-        if ($name && $address) {
-            try {
-                if ($id > 0) {
-                    // Update Cinema
-                    $stmt = $pdo->prepare("UPDATE cinemas SET name=?, address=?, city=?, phone=?, logo_url=? WHERE id=?");
-                    $stmt->execute([$name, $address, $city, $phone ?: null, $logo_url ?: null, $id]);
-
-                    // Log
-                    $logDesc = "Đã cập nhật thông tin rạp chiếu: \"$name\"";
-                    $pdo->prepare("INSERT INTO system_logs (log_time, user_name, role, action_type, action_desc) VALUES (NOW(), ?, 'admin', 'Cập nhật rạp chiếu', ?)")
-                        ->execute([$_SESSION['user_name'], $logDesc]);
-
-                    $message = "Đã cập nhật rạp chiếu <b>" . htmlspecialchars($name) . "</b> thành công!";
-                    $messageType = 'success';
-                } else {
-                    $pdo->beginTransaction();
-
-                    // Create Cinema
-                    $stmt = $pdo->prepare("INSERT INTO cinemas (name, address, city, phone, logo_url) VALUES (?, ?, ?, ?, ?)");
-                    $stmt->execute([$name, $address, $city, $phone ?: null, $logo_url ?: null]);
-                    $newCinemaId = $pdo->lastInsertId();
-
-                    // Automatically seed 6 standard rooms (100 seats each) for this new cinema
-                    $stmtInsertHall = $pdo->prepare("INSERT INTO cinema_halls (cinema_id, name, total_seats) VALUES (?, ?, 100)");
-                    for ($i = 1; $i <= 6; $i++) {
-                        $hallName = sprintf("Phòng %02d", $i);
-                        $stmtInsertHall->execute([$newCinemaId, $hallName]);
-                    }
-
-                    // Log
-                    $logDesc = "Đã thêm rạp chiếu mới: \"$name\" (Đã khởi tạo 6 phòng chiếu mặc định)";
-                    $pdo->prepare("INSERT INTO system_logs (log_time, user_name, role, action_type, action_desc) VALUES (NOW(), ?, 'admin', 'Thêm rạp mới', ?)")
-                        ->execute([$_SESSION['user_name'], $logDesc]);
-
-                    $pdo->commit();
-
-                    $message = "Đã thêm rạp mới <b>" . htmlspecialchars($name) . "</b> thành công (Đã tự động khởi tạo 6 phòng chiếu 100 ghế)!";
-                    $messageType = 'success';
-                }
-            } catch (Exception $e) {
-                if ($pdo->inTransaction()) {
-                    $pdo->rollBack();
-                }
-                $message = "Lỗi hệ thống: " . $e->getMessage();
-                $messageType = 'error';
-            }
-        } else {
-            $message = "Vui lòng điền đầy đủ các thông tin bắt buộc (Tên rạp và Địa chỉ).";
-            $messageType = 'error';
-        }
-    } elseif ($action === 'delete') {
-        $id = (int)($_POST['id'] ?? 0);
-        if ($id > 0) {
-            try {
-                // 1. Safety Check: Verify if there are any active showtimes scheduled in this cinema
-                $stCount = $pdo->prepare("SELECT COUNT(*) FROM showtimes WHERE cinema_id = ?");
-                $stCount->execute([$id]);
-                if ($stCount->fetchColumn() > 0) {
-                    $message = "Không thể xóa rạp này do đang có các Suất chiếu (Lịch chiếu) được xếp lịch. Hãy hủy hoặc xóa các suất chiếu trước.";
-                    $messageType = 'error';
-                } else {
-                    // Get cinema name for logging
-                    $cStmt = $pdo->prepare("SELECT name FROM cinemas WHERE id = ?");
-                    $cStmt->execute([$id]);
-                    $name = $cStmt->fetchColumn();
-
-                    // Delete Cinema (halls will be cascade deleted due to FOREIGN KEY constraints)
-                    $stmt = $pdo->prepare("DELETE FROM cinemas WHERE id = ?");
-                    $stmt->execute([$id]);
-                    
-                    // Log
-                    $logDesc = "Đã xóa rạp chiếu: \"$name\"";
-                    $pdo->prepare("INSERT INTO system_logs (log_time, user_name, role, action_type, action_desc) VALUES (NOW(), ?, 'admin', 'Xóa rạp chiếu', ?)")
-                        ->execute([$_SESSION['user_name'], $logDesc]);
-
-                    $message = "Đã xóa rạp chiếu <b>" . htmlspecialchars($name) . "</b> thành công!";
-                    $messageType = 'success';
-                }
-            } catch (Exception $e) {
-                $message = "Không thể xóa rạp này: " . $e->getMessage();
-                $messageType = 'error';
-            }
-        }
-    }
-}
-
-// Fetch all cinemas and count of halls per cinema
-$cinemas = $pdo->query("
-    SELECT c.*, COALESCE(h.halls_count, 0) as halls_count
-    FROM cinemas c
-    LEFT JOIN (
-        SELECT cinema_id, COUNT(*) as halls_count
-        FROM cinema_halls
-        GROUP BY cinema_id
-    ) h ON c.id = h.cinema_id
-    ORDER BY c.name ASC
-")->fetchAll(PDO::FETCH_ASSOC);
-
-// Selected cinema logic
-$selected_cinema_id = (int)($_GET['selected_id'] ?? 0);
-if (!$selected_cinema_id && count($cinemas) > 0) {
-    $selected_cinema_id = $cinemas[0]['id'];
-}
-
-$selected_cinema = null;
-foreach ($cinemas as $c) {
-    if ($c['id'] == $selected_cinema_id) {
-        $selected_cinema = $c;
-        break;
-    }
-}
-
-// Fetch halls for the selected cinema
-$selected_halls = [];
-if ($selected_cinema_id) {
-    $hStmt = $pdo->prepare("SELECT * FROM cinema_halls WHERE cinema_id = ? ORDER BY name ASC");
-    $hStmt->execute([$selected_cinema_id]);
-    $selected_halls = $hStmt->fetchAll(PDO::FETCH_ASSOC);
-}
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -438,6 +301,10 @@ if ($selected_cinema_id) {
             color: #991B1B;
             border: 1px solid #FEE2E2;
         }
+        .action-btns {
+            display: flex;
+            gap: 8px;
+        }
     </style>
 </head>
 <body>
@@ -447,22 +314,9 @@ if ($selected_cinema_id) {
 
         <!-- Main Content -->
         <main class="main-content">
-            <header class="main-header">
-                <div class="header-title">
-                    <h1>Quản lý Rạp chiếu</h1>
-                    <p>Hệ thống quản lý chi nhánh rạp và cơ cấu phòng chiếu</p>
-                </div>
-            </header>
+            <?php include 'includes/header.php'; ?>
 
-            <!-- Alerts -->
-            <?php if ($message): ?>
-                <div class="alert-bar <?= $messageType ?>">
-                    <i class="fa-solid <?= $messageType === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation' ?>"></i>
-                    <span><?= $message ?></span>
-                </div>
-            <?php endif; ?>
-
-            <div class="cinemas-layout">
+            <div class="cinemas-layout" style="margin-top: 24px;">
                 <!-- Left Cinema List -->
                 <div class="cinema-sidebar-card">
                     <h3>
@@ -472,109 +326,21 @@ if ($selected_cinema_id) {
                         </button>
                     </h3>
                     
-                    <div class="cinema-list-wrapper">
-                        <?php if (count($cinemas) === 0): ?>
-                            <div style="padding:40px 20px; text-align:center; color:#64748B;">
-                                <i class="fa-solid fa-shop-slash" style="font-size:32px; opacity:0.3; margin-bottom:12px; display:block;"></i>
-                                Chưa có rạp chiếu nào.
-                            </div>
-                        <?php else: ?>
-                            <?php foreach ($cinemas as $c): 
-                                $isActive = ($c['id'] == $selected_cinema_id) ? 'active' : '';
-                            ?>
-                                <a href="cinemas.php?selected_id=<?= $c['id'] ?>" class="cinema-list-item <?= $isActive ?>">
-                                    <?php if ($c['logo_url']): ?>
-                                        <img src="<?= htmlspecialchars($c['logo_url']) ?>" class="cinema-list-logo" alt="">
-                                    <?php else: ?>
-                                        <div class="cinema-list-logo"><i class="fa-solid fa-location-dot"></i></div>
-                                    <?php endif; ?>
-                                    <div class="cinema-list-info">
-                                        <div class="cinema-list-name" title="<?= htmlspecialchars($c['name']) ?>"><?= htmlspecialchars($c['name']) ?></div>
-                                        <div class="cinema-list-addr" title="<?= htmlspecialchars($c['address']) ?>"><?= htmlspecialchars($c['address']) ?></div>
-                                        <span class="cinema-list-badge"><i class="fa-solid fa-door-open"></i> <?= $c['halls_count'] ?> Phòng chiếu</span>
-                                    </div>
-                                </a>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
+                    <div class="cinema-list-wrapper" id="cinemaList">
+                        <div style="padding:40px 20px; text-align:center; color:#64748B;">
+                            <i class="fa-solid fa-spinner fa-spin" style="font-size:24px; margin-bottom:8px; display:block;"></i>
+                            Đang tải danh sách rạp...
+                        </div>
                     </div>
                 </div>
 
                 <!-- Right Selected Cinema Details & Halls -->
-                <div class="cinema-details-card">
-                    <?php if (!$selected_cinema): ?>
-                        <div style="padding:80px 20px; text-align:center; color:#64748B;">
-                            <i class="fa-solid fa-shop" style="font-size:48px; opacity:0.2; margin-bottom:16px; display:block;"></i>
-                            <h3>Chọn một rạp từ danh sách để xem chi tiết phòng chiếu</h3>
-                            <p style="margin-top:6px; font-size:13px;">Hoặc nhấn nút "Thêm rạp" để đăng ký chi nhánh rạp mới.</p>
-                        </div>
-                    <?php else: ?>
-                        <!-- Details Header -->
-                        <div class="details-header">
-                            <?php if ($selected_cinema['logo_url']): ?>
-                                <img src="<?= htmlspecialchars($selected_cinema['logo_url']) ?>" class="details-logo" alt="">
-                            <?php else: ?>
-                                <div class="details-logo"><i class="fa-solid fa-location-dot"></i></div>
-                            <?php endif; ?>
-                            
-                            <div class="details-title-info">
-                                <h2 class="details-title"><?= htmlspecialchars($selected_cinema['name']) ?></h2>
-                                <div class="details-meta-row">
-                                    <div class="details-meta-item"><i class="fa-solid fa-map-pin"></i> <span><?= htmlspecialchars($selected_cinema['address']) ?> (<?= htmlspecialchars($selected_cinema['city'] ?: 'Hà Nội') ?>)</span></div>
-                                    <?php if ($selected_cinema['phone']): ?>
-                                        <div class="details-meta-item"><i class="fa-solid fa-phone"></i> <span><?= htmlspecialchars($selected_cinema['phone']) ?></span></div>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                            
-                            <div class="action-btns" style="align-self: flex-start;">
-                                <button class="btn-cinema-action btn-cinema-edit" onclick='openEditCinemaModal(<?= json_encode($selected_cinema) ?>)'>
-                                    <i class="fa-solid fa-pen-to-square"></i> Sửa rạp
-                                </button>
-                                
-                                <form method="POST" id="form-delete-cinema" style="display:none;">
-                                    <input type="hidden" name="action" value="delete">
-                                    <input type="hidden" name="id" value="<?= $selected_cinema['id'] ?>">
-                                </form>
-                                <button type="button" class="btn-cinema-action btn-cinema-delete" onclick="confirmDeleteCinema('<?= htmlspecialchars(addslashes($selected_cinema['name'])) ?>')">
-                                    <i class="fa-solid fa-trash-can"></i> Xóa rạp
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Halls Section -->
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                            <h3 style="font-size:15px; font-weight:800; color:#334155;"><i class="fa-solid fa-door-open" style="color:var(--primary-blue);margin-right:6px"></i>Sơ đồ Phòng chiếu (Halls)</h3>
-                            <span style="font-size:12.5px; color:#64748B; font-weight:500;">Quy chuẩn rạp: <strong><?= count($selected_halls) ?> Phòng tiêu chuẩn</strong></span>
-                        </div>
-
-                        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; font-size: 13px; color: #475569; line-height: 1.5;">
-                            <i class="fa-solid fa-circle-info" style="color: var(--primary-blue); margin-right: 6px;"></i>
-                            Mỗi rạp chiếu phim trong hệ thống MovieFlex được chuẩn hóa đồng bộ **6 phòng chiếu tiêu chuẩn** (Phòng 01 đến Phòng 06, với sức chứa **100 ghế ngồi** tương đương sơ đồ 10 hàng ghế A-J). Tính năng thêm/xóa phòng chiếu thủ công được bỏ qua để đảm bảo tính nhất quán của sơ đồ phòng chiếu toàn hệ thống.
-                        </div>
-
-                        <table class="halls-table">
-                            <thead>
-                                <tr>
-                                    <th>Tên phòng chiếu</th>
-                                    <th>Loại phòng</th>
-                                    <th>Sức chứa</th>
-                                    <th>Cơ cấu hàng ghế</th>
-                                    <th>Trạng thái</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($selected_halls as $hall): ?>
-                                    <tr>
-                                        <td><strong><?= htmlspecialchars($hall['name']) ?></strong></td>
-                                        <td><span class="halls-badge">Tiêu chuẩn (Standard)</span></td>
-                                        <td><strong><?= $hall['total_seats'] ?> ghế</strong></td>
-                                        <td>Hàng A đến J (10 ghế/hàng)</td>
-                                        <td><span style="color:#10B981; font-weight:700; font-size:12.5px;"><i class="fa-solid fa-circle-check"></i> Đang hoạt động</span></td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    <?php endif; ?>
+                <div class="cinema-details-card" id="cinemaDetailsContainer">
+                    <div style="padding:80px 20px; text-align:center; color:#64748B;">
+                        <i class="fa-solid fa-shop" style="font-size:48px; opacity:0.2; margin-bottom:16px; display:block;"></i>
+                        <h3>Chọn một rạp từ danh sách để xem chi tiết phòng chiếu</h3>
+                        <p style="margin-top:6px; font-size:13px;">Hoặc nhấn nút "Thêm rạp" để đăng ký chi nhánh rạp mới.</p>
+                    </div>
                 </div>
             </div>
         </main>
@@ -591,7 +357,7 @@ if ($selected_cinema_id) {
                 <button class="close-modal" onclick="closeCinemaModal()" style="border:none; background:none; font-size:20px; cursor:pointer; color:#64748B;"><i class="fa-solid fa-xmark"></i></button>
             </div>
             
-            <form method="POST">
+            <form id="cinemaForm">
                 <input type="hidden" name="action" value="save">
                 <input type="hidden" name="id" id="form-id" value="0">
                 
@@ -642,7 +408,216 @@ if ($selected_cinema_id) {
     </div>
 
     <script>
-        async function confirmDeleteCinema(cinemaName) {
+        let allCinemas = [];
+        let selectedCinemaId = null;
+        let selectedHalls = [];
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.toString()
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function escapeJs(text) {
+            if (!text) return '';
+            return text.toString().replace(/'/g, "\\'").replace(/"/g, '\\"');
+        }
+
+        async function fetchCinemas() {
+            try {
+                const res = await fetch('../../be/controllers/admin/AdminCinemaController.php?action=list');
+                const json = await res.json();
+                
+                if (json.success) {
+                    allCinemas = json.data || [];
+                    renderCinemaList();
+                    
+                    if (allCinemas.length > 0) {
+                        if (selectedCinemaId === null) {
+                            selectCinema(allCinemas[0].id);
+                        } else {
+                            const stillExists = allCinemas.some(item => item.id == selectedCinemaId);
+                            if (stillExists) {
+                                selectCinema(selectedCinemaId);
+                            } else {
+                                selectCinema(allCinemas[0].id);
+                            }
+                        }
+                    } else {
+                        selectedCinemaId = null;
+                        selectedHalls = [];
+                        renderCinemaDetails();
+                    }
+                } else {
+                    mfToast('Lỗi tải danh sách', json.message || 'Không thể tải danh sách rạp.', 'danger');
+                }
+            } catch (e) {
+                console.error('Error fetching cinemas:', e);
+                mfToast('Lỗi hệ thống', 'Không thể kết nối máy chủ để tải thông tin rạp.', 'warning');
+            }
+        }
+
+        async function selectCinema(cinemaId) {
+            selectedCinemaId = cinemaId;
+            
+            // Highlight list item
+            const items = document.querySelectorAll('.cinema-list-item');
+            items.forEach(item => item.classList.remove('active'));
+            
+            // Find current item in DOM to highlight
+            const currentItem = Array.from(items).find(item => item.getAttribute('data-id') == cinemaId);
+            if (currentItem) currentItem.classList.add('active');
+
+            // Render details (loading state for halls)
+            const detailsContainer = document.getElementById('cinemaDetailsContainer');
+            const c = allCinemas.find(item => item.id == cinemaId);
+            if (!c) return;
+
+            // Fetch halls
+            try {
+                const res = await fetch(`../../be/controllers/admin/AdminCinemaController.php?action=get_halls&cinema_id=${cinemaId}`);
+                const json = await res.json();
+                
+                if (json.success) {
+                    selectedHalls = json.halls || [];
+                } else {
+                    selectedHalls = [];
+                    console.error('Failed to load halls:', json.message);
+                }
+            } catch (e) {
+                selectedHalls = [];
+                console.error('Error loading halls:', e);
+            }
+            
+            renderCinemaDetails();
+        }
+
+        function renderCinemaList() {
+            const listWrapper = document.getElementById('cinemaList');
+            if (allCinemas.length === 0) {
+                listWrapper.innerHTML = `
+                    <div style="padding:40px 20px; text-align:center; color:#64748B;">
+                        <i class="fa-solid fa-shop-slash" style="font-size:32px; opacity:0.3; margin-bottom:12px; display:block;"></i>
+                        Chưa có rạp chiếu nào.
+                    </div>`;
+                return;
+            }
+
+            let html = '';
+            allCinemas.forEach(c => {
+                const isActive = (c.id == selectedCinemaId) ? 'active' : '';
+                const logoHtml = c.logo_url 
+                    ? `<img src="${escapeHtml(c.logo_url)}" class="cinema-list-logo" alt="">`
+                    : `<div class="cinema-list-logo"><i class="fa-solid fa-location-dot"></i></div>`;
+                    
+                html += `
+                    <div class="cinema-list-item ${isActive}" data-id="${c.id}" onclick="selectCinema(${c.id})">
+                        ${logoHtml}
+                        <div class="cinema-list-info">
+                            <div class="cinema-list-name" title="${escapeHtml(c.name)}">${escapeHtml(c.name)}</div>
+                            <div class="cinema-list-addr" title="${escapeHtml(c.address)}">${escapeHtml(c.address)}</div>
+                            <span class="cinema-list-badge"><i class="fa-solid fa-door-open"></i> ${c.halls_count} Phòng chiếu</span>
+                        </div>
+                    </div>`;
+            });
+            listWrapper.innerHTML = html;
+        }
+
+        function renderCinemaDetails() {
+            const container = document.getElementById('cinemaDetailsContainer');
+            if (!selectedCinemaId) {
+                container.innerHTML = `
+                    <div style="padding:80px 20px; text-align:center; color:#64748B;">
+                        <i class="fa-solid fa-shop" style="font-size:48px; opacity:0.2; margin-bottom:16px; display:block;"></i>
+                        <h3>Chọn một rạp từ danh sách để xem chi tiết phòng chiếu</h3>
+                        <p style="margin-top:6px; font-size:13px;">Hoặc nhấn nút "Thêm rạp" để đăng ký chi nhánh rạp mới.</p>
+                    </div>`;
+                return;
+            }
+
+            const c = allCinemas.find(item => item.id == selectedCinemaId);
+            if (!c) return;
+
+            const logoHtml = c.logo_url 
+                ? `<img src="${escapeHtml(c.logo_url)}" class="details-logo" alt="">`
+                : `<div class="details-logo"><i class="fa-solid fa-location-dot"></i></div>`;
+
+            const phoneHtml = c.phone 
+                ? `<div class="details-meta-item"><i class="fa-solid fa-phone"></i> <span>${escapeHtml(c.phone)}</span></div>`
+                : '';
+
+            let hallsRows = '';
+            if (selectedHalls.length === 0) {
+                hallsRows = `<tr><td colspan="5" class="text-center" style="color:var(--text-muted);">Không tìm thấy phòng chiếu nào.</td></tr>`;
+            } else {
+                selectedHalls.forEach(hall => {
+                    hallsRows += `
+                        <tr>
+                            <td><strong>${escapeHtml(hall.name)}</strong></td>
+                            <td><span class="halls-badge">Tiêu chuẩn (Standard)</span></td>
+                            <td><strong>${hall.total_seats} ghế</strong></td>
+                            <td>Hàng A đến J (10 ghế/hàng)</td>
+                            <td><span style="color:#10B981; font-weight:700; font-size:12.5px;"><i class="fa-solid fa-circle-check"></i> Đang hoạt động</span></td>
+                        </tr>`;
+                });
+            }
+
+            container.innerHTML = `
+                <!-- Details Header -->
+                <div class="details-header">
+                    ${logoHtml}
+                    
+                    <div class="details-title-info">
+                        <h2 class="details-title">${escapeHtml(c.name)}</h2>
+                        <div class="details-meta-row">
+                            <div class="details-meta-item"><i class="fa-solid fa-map-pin"></i> <span>${escapeHtml(c.address)} (${escapeHtml(c.city || 'Hà Nội')})</span></div>
+                            ${phoneHtml}
+                        </div>
+                    </div>
+                    
+                    <div class="action-btns" style="align-self: flex-start;">
+                        <button class="btn-cinema-action btn-cinema-edit" onclick="openEditCinemaModal(${c.id})">
+                            <i class="fa-solid fa-pen-to-square"></i> Sửa rạp
+                        </button>
+                        
+                        <button type="button" class="btn-cinema-action btn-cinema-delete" onclick="confirmDeleteCinema(${c.id}, '${escapeJs(c.name)}')">
+                            <i class="fa-solid fa-trash-can"></i> Xóa rạp
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Halls Section -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <h3 style="font-size:15px; font-weight:800; color:#334155;"><i class="fa-solid fa-door-open" style="color:var(--primary-blue);margin-right:6px"></i>Sơ đồ Phòng chiếu (Halls)</h3>
+                    <span style="font-size:12.5px; color:#64748B; font-weight:500;">Quy chuẩn rạp: <strong>${selectedHalls.length} Phòng tiêu chuẩn</strong></span>
+                </div>
+
+                <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; font-size: 13px; color: #475569; line-height: 1.5;">
+                    <i class="fa-solid fa-circle-info" style="color: var(--primary-blue); margin-right: 6px;"></i>
+                    Mỗi rạp chiếu phim trong hệ thống MovieFlex được chuẩn hóa đồng bộ **6 phòng chiếu tiêu chuẩn** (Phòng 01 đến Phòng 06, với sức chứa **100 ghế ngồi** tương đương sơ đồ 10 hàng ghế A-J). Tính năng thêm/xóa phòng chiếu thủ công được bỏ qua để đảm bảo tính nhất quán của sơ đồ phòng chiếu toàn hệ thống.
+                </div>
+
+                <table class="halls-table">
+                    <thead>
+                        <tr>
+                            <th>Tên phòng chiếu</th>
+                            <th>Loại phòng</th>
+                            <th>Sức chứa</th>
+                            <th>Cơ cấu hàng ghế</th>
+                            <th>Trạng thái</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${hallsRows}
+                    </tbody>
+                </table>`;
+        }
+
+        async function confirmDeleteCinema(cinemaId, cinemaName) {
             const ok = await mfConfirm({
                 title: 'Xóa rạp chiếu',
                 desc: `Bạn có chắc chắn muốn XÓA rạp <strong>${cinemaName}</strong>?<br><br>⚠️ Tất cả <strong>phòng chiếu</strong> liên kết sẽ bị xóa theo. Hành động này <strong>không thể hoàn tác</strong>.`,
@@ -652,9 +627,73 @@ if ($selected_cinema_id) {
                 cancelText: 'Giữ lại'
             });
             if (ok) {
-                document.getElementById('form-delete-cinema').submit();
+                try {
+                    const formData = new FormData();
+                    formData.append('action', 'delete');
+                    formData.append('id', cinemaId);
+
+                    const res = await fetch('../../be/controllers/admin/AdminCinemaController.php?action=delete', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const json = await res.json();
+                    
+                    if (json.success) {
+                        mfToast('Thành công', json.message || 'Đã xóa rạp chiếu thành công!', 'success');
+                        selectedCinemaId = null;
+                        await fetchCinemas();
+                    } else {
+                        mfToast('Lỗi khi xóa', json.message || 'Đã xảy ra lỗi khi xóa rạp chiếu.', 'danger', 7000);
+                    }
+                } catch (e) {
+                    console.error('Error deleting cinema:', e);
+                    mfToast('Lỗi hệ thống', 'Không thể kết nối máy chủ để xóa rạp. Vui lòng thử lại.', 'warning');
+                }
             }
         }
+
+        document.getElementById('cinemaForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalBtnHTML = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu rạp...';
+
+            try {
+                const formData = new FormData(this);
+                formData.set('action', 'save');
+
+                const res = await fetch('../../be/controllers/admin/AdminCinemaController.php?action=save', {
+                    method: 'POST',
+                    body: formData
+                });
+                const json = await res.json();
+                
+                if (json.success) {
+                    mfToast('Thành công', json.message || 'Đã lưu thông tin rạp thành công!', 'success');
+                    closeCinemaModal();
+                    
+                    // Set active selection if updating or set to null to load the newly added one
+                    const formIdVal = document.getElementById('form-id').value;
+                    if (formIdVal != '0') {
+                        selectedCinemaId = formIdVal;
+                    } else {
+                        selectedCinemaId = null; // Auto pick first
+                    }
+                    
+                    await fetchCinemas();
+                } else {
+                    mfToast('Lỗi lưu rạp', json.message || 'Đã xảy ra lỗi khi lưu rạp.', 'danger', 7000);
+                }
+            } catch (err) {
+                console.error('Lỗi khi lưu rạp:', err);
+                mfToast('Lỗi hệ thống', 'Không thể kết nối máy chủ để lưu rạp. Vui lòng thử lại.', 'warning');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHTML;
+            }
+        });
 
         function openAddCinemaModal() {
             document.getElementById('modal-title-text').textContent = 'Thêm Rạp chiếu mới';
@@ -669,7 +708,10 @@ if ($selected_cinema_id) {
             document.getElementById('cinemaModal').classList.add('active');
         }
 
-        function openEditCinemaModal(c) {
+        function openEditCinemaModal(id) {
+            const c = allCinemas.find(item => item.id == id);
+            if (!c) return;
+
             document.getElementById('modal-title-text').textContent = 'Sửa thông tin Rạp #' + c.id;
             document.getElementById('form-id').value = c.id;
             document.getElementById('form-name').value = c.name;
@@ -685,8 +727,10 @@ if ($selected_cinema_id) {
         function closeCinemaModal() {
             document.getElementById('cinemaModal').classList.remove('active');
         }
+
+        // Initialize page
+        fetchCinemas();
     </script>
     <script src="../assets/js/script.js"></script>
 </body>
 </html>
-

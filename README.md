@@ -1,6 +1,6 @@
 # MoviePlex - Platform
 
-Ứng dụng đặt vé xem phim nhóm xây dựng bằng PHP thuần, tổ chức theo mô hình MVC, chạy trên môi trường Docker (Apache + MySQL). 
+Ứng dụng đặt vé xem phim nhóm xây dựng bằng PHP thuần, tổ chức theo mô hình MVC, chạy trên môi trường Docker (Apache + MySQL).
 
 ---
 
@@ -17,15 +17,15 @@
 
 ## Công nghệ sử dụng
 
-| Thành phần | Công nghệ |
-|---|---|
-| Backend | PHP 8.2 (thuần) |
-| Frontend | HTML / CSS / JavaScript thuần |
-| Database | MySQL 8 |
-| Web Server | Apache 2 (mod_rewrite) |
-| Môi trường | Docker + Docker Compose |
-| Gửi email | PHPMailer (Composer) |
-| DB GUI | phpMyAdmin |
+| Thành phần | Công nghệ                     |
+| ---------- | ----------------------------- |
+| Backend    | PHP 8.2 (thuần)               |
+| Frontend   | HTML / CSS / JavaScript thuần |
+| Database   | MySQL 8                       |
+| Web Server | Apache 2 (mod_rewrite)        |
+| Môi trường | Docker + Docker Compose       |
+| Gửi email  | PHPMailer (Composer)          |
+| DB GUI     | phpMyAdmin                    |
 
 ---
 
@@ -100,11 +100,11 @@ Lần đầu chạy, Docker sẽ tự động build image và khởi tạo datab
 
 ### 5. Truy cập
 
-| Dịch vụ | URL |
-|---|---|
-| Ứng dụng | http://localhost:8080 |
+| Dịch vụ    | URL                   |
+| ---------- | --------------------- |
+| Ứng dụng   | http://localhost:8080 |
 | phpMyAdmin | http://localhost:8081 |
-| MySQL | localhost:3306 |
+| MySQL      | localhost:3306        |
 
 ---
 
@@ -132,13 +132,11 @@ docker compose down
 ## Thành viên nhóm
 
 | Tên | Vai trò | GitHub |
-|---|---|---|
-| | | |
+| --- | ------- | ------ |
+|     |         |        |
 
 ---
 
 ## Ghi chú
 
 Dự án phục vụ mục đích học tập — nhóm môn học tại Trường Đại học Công nghệ Giao thông Vận tải (UTT).
-
-thành viên Nam, Phát, Chương, Đúc.
