@@ -80,3 +80,53 @@ $router->get('seat_selection',        [$bookingController, 'seatSelectionData'])
 $router->post('voucher_dashboard',    [$voucherController, 'dashboard'],       [$auth]);
 $router->post('redeem_reward',        [$voucherController, 'redeem'],          [$auth]);
 $router->post('my_vouchers',          [$voucherController, 'myVouchers'],      [$auth]);
+
+// ── ADMIN (requires admin_monitor or admin role) ──────────────────────────
+
+require_once BASE_PATH . '/be/controllers/admin/AdminCinemaController.php';
+require_once BASE_PATH . '/be/controllers/admin/AdminMovieController.php';
+require_once BASE_PATH . '/be/controllers/admin/AdminVoucherController.php';
+require_once BASE_PATH . '/be/controllers/admin/AdminRevenueController.php';
+require_once BASE_PATH . '/be/controllers/admin/AdminShowtimeController.php';
+
+$adminCinema = new AdminCinemaController($pdo);
+$adminMovie = new AdminMovieController($pdo);
+$adminVoucher = new AdminVoucherController($pdo);
+$adminRevenue = new AdminRevenueController($pdo);
+$adminShowtime = new AdminShowtimeController($pdo);
+
+$admin = [AdminMiddleware::class, 'api'];
+
+// Admin Cinema Routes
+$router->get('admin_cinema_list',      [$adminCinema, 'list'],      [$admin]);
+$router->get('admin_cinema_halls',     [$adminCinema, 'getHalls'],  [$admin]);
+$router->post('admin_cinema_save',     [$adminCinema, 'save'],      [$admin]);
+$router->post('admin_cinema_delete',   [$adminCinema, 'delete'],    [$admin]);
+
+// Admin Movie Routes
+$router->get('admin_movie_list',       [$adminMovie, 'list'],       [$admin]);
+$router->get('admin_movie_stats',      [$adminMovie, 'stats'],      [$admin]);
+$router->post('admin_movie_save',      [$adminMovie, 'save'],       [$admin]);
+$router->post('admin_movie_delete',    [$adminMovie, 'delete'],     [$admin]);
+
+// Admin Voucher Routes
+$router->get('admin_voucher_list',     [$adminVoucher, 'list'],     [$admin]);
+$router->get('admin_voucher_stats',    [$adminVoucher, 'stats'],    [$admin]);
+$router->post('admin_voucher_save',    [$adminVoucher, 'save'],     [$admin]);
+$router->post('admin_voucher_toggle',  [$adminVoucher, 'toggleActive'], [$admin]);
+$router->post('admin_voucher_delete',  [$adminVoucher, 'delete'],   [$admin]);
+
+// Admin Revenue & Dashboard & Logs & Employees Routes
+$router->get('admin_dashboard_data',   [$adminRevenue, 'dashboardData'], [$admin]);
+$router->get('admin_logs',             [$adminRevenue, 'getLogs'],       [$admin]);
+$router->get('admin_employees',        [$adminRevenue, 'getEmployees'],  [$admin]);
+$router->get('admin_revenue_report',   [$adminRevenue, 'getRevenueReport'], [$admin]);
+
+// Admin Showtime Routes
+$router->get('admin_showtime_initial', [$adminShowtime, 'getInitialData'], [$admin]);
+$router->get('admin_showtime_list',    [$adminShowtime, 'list'],            [$admin]);
+$router->get('admin_showtime_halls',   [$adminShowtime, 'getCinemaHalls'],  [$admin]);
+$router->get('admin_showtime_conflict',[$adminShowtime, 'checkConflict'],   [$admin]);
+$router->post('admin_showtime_save',   [$adminShowtime, 'save'],            [$admin]);
+$router->post('admin_showtime_delete', [$adminShowtime, 'delete'],          [$admin]);
+$router->post('admin_showtime_cancel', [$adminShowtime, 'cancelUrgent'],    [$admin]);

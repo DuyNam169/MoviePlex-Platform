@@ -14,7 +14,7 @@ session_start();
 html,body{margin:0;padding:0;height:100%;overflow:hidden}
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --blue:#DF1730;
+  --blue:#DF1730;--blue-h:#C21025;--blue-light:#FAF0F1;
   --sb:#0F172A;--sbw:240px;
   --bg:#F1F5F9;--card:#fff;
   --text:#0F172A;--muted:#64748B;--light:#94A3B8;--border:#E2E8F0;
