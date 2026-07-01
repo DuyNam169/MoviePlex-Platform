@@ -356,7 +356,7 @@ if (empty($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
 
         async function fetchStats() {
             try {
-                const res = await fetch('../../be/controllers/admin/AdminMovieController.php?action=stats');
+                const res = await fetch('../../be/api.php?action=admin_movie_stats');
                 const json = await res.json();
                 
                 if (json.success) {
@@ -371,7 +371,7 @@ if (empty($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
 
         async function fetchMovies() {
             try {
-                const res = await fetch('../../be/controllers/admin/AdminMovieController.php?action=list');
+                const res = await fetch('../../be/api.php?action=admin_movie_list');
                 const json = await res.json();
                 
                 if (json.success) {
@@ -477,10 +477,10 @@ if (empty($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
             if (ok) {
                 try {
                     const formData = new FormData();
-                    formData.append('action', 'delete');
+                    formData.append('action', 'admin_movie_delete');
                     formData.append('id', id);
 
-                    const res = await fetch('../../be/controllers/admin/AdminMovieController.php?action=delete', {
+                    const res = await fetch('../../be/api.php', {
                         method: 'POST',
                         body: formData
                     });
@@ -532,9 +532,9 @@ if (empty($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
 
             try {
                 const formData = new FormData(this);
-                formData.set('action', 'save');
+                formData.set('action', 'admin_movie_save');
 
-                const res = await fetch('../../be/controllers/admin/AdminMovieController.php?action=save', {
+                const res = await fetch('../../be/api.php', {
                     method: 'POST',
                     body: formData
                 });

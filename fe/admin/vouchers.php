@@ -506,7 +506,7 @@ if (empty($_SESSION['user_id']) || !in_array($_SESSION['user_role'], ['admin', '
 
         async function fetchStats() {
             try {
-                const res = await fetch('../../be/controllers/admin/AdminVoucherController.php?action=stats');
+                const res = await fetch('../../be/api.php?action=admin_voucher_stats');
                 const json = await res.json();
                 if (json.success) {
                     document.getElementById('stat-total').textContent = json.stats.total;
@@ -520,7 +520,7 @@ if (empty($_SESSION['user_id']) || !in_array($_SESSION['user_role'], ['admin', '
 
         async function fetchVouchers() {
             try {
-                const res = await fetch('../../be/controllers/admin/AdminVoucherController.php?action=list');
+                const res = await fetch('../../be/api.php?action=admin_voucher_list');
                 const json = await res.json();
                 if (json.success) {
                     allVouchers = json.data;
@@ -662,11 +662,11 @@ if (empty($_SESSION['user_id']) || !in_array($_SESSION['user_role'], ['admin', '
         async function toggleVoucherStatus(id, newStatus) {
             try {
                 const formData = new FormData();
-                formData.append('action', 'toggle_active');
+                formData.append('action', 'admin_voucher_toggle');
                 formData.append('id', id);
                 formData.append('status', newStatus);
                 
-                const res = await fetch('../../be/controllers/admin/AdminVoucherController.php?action=toggle_active', {
+                const res = await fetch('../../be/api.php', {
                     method: 'POST',
                     body: formData
                 });
@@ -697,10 +697,10 @@ if (empty($_SESSION['user_id']) || !in_array($_SESSION['user_role'], ['admin', '
             if (ok) {
                 try {
                     const formData = new FormData();
-                    formData.append('action', 'delete');
+                    formData.append('action', 'admin_voucher_delete');
                     formData.append('id', id);
                     
-                    const res = await fetch('../../be/controllers/admin/AdminVoucherController.php?action=delete', {
+                    const res = await fetch('../../be/api.php', {
                         method: 'POST',
                         body: formData
                     });
@@ -730,9 +730,9 @@ if (empty($_SESSION['user_id']) || !in_array($_SESSION['user_role'], ['admin', '
             
             try {
                 const formData = new FormData(this);
-                formData.set('action', 'save');
+                formData.set('action', 'admin_voucher_save');
                 
-                const res = await fetch('../../be/controllers/admin/AdminVoucherController.php?action=save', {
+                const res = await fetch('../../be/api.php', {
                     method: 'POST',
                     body: formData
                 });

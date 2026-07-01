@@ -70,7 +70,7 @@ class MailService
             $mail->SMTPAuth   = true;
             $mail->Username   = $this->smtpUser;
             $mail->Password   = $this->smtpPass;
-            $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+            $mail->SMTPSecure = $this->smtpPort === 465 ? \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS : \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
             $mail->Port       = $this->smtpPort;
             $mail->CharSet    = 'UTF-8';
 

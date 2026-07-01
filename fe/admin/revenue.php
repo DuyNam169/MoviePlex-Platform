@@ -334,12 +334,12 @@ if (empty($_SESSION['user_id']) || !in_array($_SESSION['user_role'], ['admin', '
 
             try {
                 const queryParams = new URLSearchParams();
-                queryParams.append('action', 'get_revenue_report');
+                queryParams.append('action', 'admin_revenue_report');
                 for (const [key, val] of Object.entries(params)) {
                     if (val) queryParams.append(key, val);
                 }
 
-                const res = await fetch('../../be/controllers/admin/AdminRevenueController.php?' + queryParams.toString());
+                const res = await fetch('../../be/api.php?' + queryParams.toString());
                 const json = await res.json();
                 
                 if (!json.success) {
