@@ -59,7 +59,7 @@ function getActionIcon(actionType) {
 
 async function fetchDashboardData() {
     try {
-        const response = await fetch(apiPrefix + '../be/controllers/admin/AdminRevenueController.php?action=dashboard_data');
+        const response = await fetch(apiPrefix + '../be/api.php?action=admin_dashboard_data');
         const data = await response.json();
         
         // Update KPIs
@@ -142,7 +142,7 @@ const logsPerPage = 15;
 
 async function fetchLogsData() {
     try {
-        const response = await fetch(apiPrefix + '../be/controllers/admin/AdminRevenueController.php?action=get_logs');
+        const response = await fetch(apiPrefix + '../be/api.php?action=admin_logs');
         const json = await response.json();
         if (json.success && json.data) {
             allLogs = json.data;
@@ -337,7 +337,7 @@ function changeLogsPage(page) {
 
 async function fetchUsersData() {
     try {
-        const response = await fetch(apiPrefix + '../be/controllers/admin/AdminRevenueController.php?action=get_employees');
+        const response = await fetch(apiPrefix + '../be/api.php?action=admin_employees');
         const json = await response.json();
         
         if (json.success && json.data) {

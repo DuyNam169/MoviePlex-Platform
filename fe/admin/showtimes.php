@@ -487,7 +487,7 @@ if (empty($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
 
         async function fetchInitialData() {
             try {
-                const res = await fetch('../../be/controllers/admin/AdminShowtimeController.php?action=get_initial_data');
+                const res = await fetch('../../be/api.php?action=admin_showtime_initial');
                 const json = await res.json();
                 
                 if (json.success) {
@@ -547,7 +547,7 @@ if (empty($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
             tbody.innerHTML = '<tr><td colspan="9" class="text-center" style="padding: 40px; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải danh sách suất chiếu...</td></tr>';
             
             try {
-                const res = await fetch('../../be/controllers/admin/AdminShowtimeController.php?action=list');
+                const res = await fetch('../../be/api.php?action=admin_showtime_list');
                 const json = await res.json();
                 
                 if (json.success) {
@@ -574,7 +574,7 @@ if (empty($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
             }
             
             try {
-                const res = await fetch(`../../be/controllers/admin/AdminShowtimeController.php?action=get_cinema_halls&cinema_id=${cinemaId}`);
+                const res = await fetch(`../../be/api.php?action=admin_showtime_halls&cinema_id=${cinemaId}`);
                 const json = await res.json();
                 
                 if (json.success && json.halls.length > 0) {
@@ -701,10 +701,10 @@ if (empty($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
             if (ok) {
                 try {
                     const formData = new FormData();
-                    formData.append('action', 'delete');
+                    formData.append('action', 'admin_showtime_delete');
                     formData.append('id', id);
                     
-                    const res = await fetch('../../be/controllers/admin/AdminShowtimeController.php?action=delete', {
+                    const res = await fetch('../../be/api.php', {
                         method: 'POST',
                         body: formData
                     });
@@ -798,7 +798,7 @@ if (empty($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
             const endTime = document.getElementById('form-end').value;
 
             try {
-                const url = `../../be/controllers/admin/AdminShowtimeController.php?action=check_conflict&id=${id}&movie_id=${movieId}&cinema_id=${cinemaId}&hall_name=${encodeURIComponent(hallName)}&show_date=${showDate}&start_time=${startTime}&end_time=${endTime}`;
+                const url = `../../be/api.php?action=admin_showtime_conflict&id=${id}&movie_id=${movieId}&cinema_id=${cinemaId}&hall_name=${encodeURIComponent(hallName)}&show_date=${showDate}&start_time=${startTime}&end_time=${endTime}`;
                 const res = await fetch(url);
                 const json = await res.json();
 
@@ -811,9 +811,9 @@ if (empty($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
 
                 // Hợp lệ -> Lưu qua AJAX
                 const formData = new FormData(this);
-                formData.set('action', 'save');
+                formData.set('action', 'admin_showtime_save');
                 
-                const saveRes = await fetch('../../be/controllers/admin/AdminShowtimeController.php?action=save', {
+                const saveRes = await fetch('../../be/api.php', {
                     method: 'POST',
                     body: formData
                 });
@@ -845,9 +845,9 @@ if (empty($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
             
             try {
                 const formData = new FormData(this);
-                formData.set('action', 'cancel_urgent');
+                formData.set('action', 'admin_showtime_cancel');
                 
-                const res = await fetch('../../be/controllers/admin/AdminShowtimeController.php?action=cancel_urgent', {
+                const res = await fetch('../../be/api.php', {
                     method: 'POST',
                     body: formData
                 });
