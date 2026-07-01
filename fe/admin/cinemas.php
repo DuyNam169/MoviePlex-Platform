@@ -429,7 +429,7 @@ if (empty($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
 
         async function fetchCinemas() {
             try {
-                const res = await fetch('../../be/controllers/admin/AdminCinemaController.php?action=list');
+                const res = await fetch('../../be/api.php?action=admin_cinema_list');
                 const json = await res.json();
                 
                 if (json.success) {
@@ -479,7 +479,7 @@ if (empty($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
 
             // Fetch halls
             try {
-                const res = await fetch(`../../be/controllers/admin/AdminCinemaController.php?action=get_halls&cinema_id=${cinemaId}`);
+                const res = await fetch(`../../be/api.php?action=admin_cinema_halls&cinema_id=${cinemaId}`);
                 const json = await res.json();
                 
                 if (json.success) {
@@ -629,10 +629,10 @@ if (empty($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
             if (ok) {
                 try {
                     const formData = new FormData();
-                    formData.append('action', 'delete');
+                    formData.append('action', 'admin_cinema_delete');
                     formData.append('id', cinemaId);
 
-                    const res = await fetch('../../be/controllers/admin/AdminCinemaController.php?action=delete', {
+                    const res = await fetch('../../be/api.php', {
                         method: 'POST',
                         body: formData
                     });
@@ -662,9 +662,9 @@ if (empty($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
 
             try {
                 const formData = new FormData(this);
-                formData.set('action', 'save');
+                formData.set('action', 'admin_cinema_save');
 
-                const res = await fetch('../../be/controllers/admin/AdminCinemaController.php?action=save', {
+                const res = await fetch('../../be/api.php', {
                     method: 'POST',
                     body: formData
                 });
