@@ -13,7 +13,7 @@ class MailService
     public function __construct()
     {
         // DEV_MODE = true: skip actual SMTP, log OTP to error_log instead
-        $this->devMode   = (getenv('MAIL_DEV_MODE') ?: 'true') === 'true';
+        $this->devMode = false;
         $this->smtpHost  = getenv('MAIL_HOST')     ?: 'smtp.gmail.com';
         $this->smtpPort  = (int)(getenv('MAIL_PORT') ?: 587);
         $this->smtpUser  = getenv('MAIL_USERNAME') ?: '';
